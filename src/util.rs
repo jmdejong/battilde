@@ -29,6 +29,16 @@ pub fn randomize (mut seed: u32) -> u32 {
 	seed
 }
 
+pub fn partition_by(s: &str, pat: &str) -> (String, String) {
+	let mut parts: Vec<String> = s.splitn(2, pat).map(String::from).collect();
+	while parts.len() < 2 {
+		parts.push("".to_string())
+	}
+	(parts.remove(0), parts.remove(0))
+}
+
+
+#[allow(dead_code)]
 pub fn write_file_safe<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<(), AnyError> {
 	let temppath = path
 		.as_ref()

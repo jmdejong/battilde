@@ -17,7 +17,6 @@ mod sprite;
 mod timestamp;
 mod config;
 mod errors;
-mod auth;
 
 use self::{
 	pos::Pos,
@@ -60,13 +59,7 @@ fn main(){
 		.map(|a| a.to_server().unwrap())
 		.collect();
 	
-	let user_dir = config.user_dir.unwrap_or(
-		auth::FileRegister::default_register_dir().expect("couldn't find any save directory")
-	);
-	println!("user auth directory: {:?}", user_dir);
-	let users = auth::FileRegister::new(user_dir);
-	
-	let mut gameserver = GameServer::new(servers, Box::new(users), config.admins);
+	let mut gameserver = GameServer::new(servers, config.admins);
 	
 
 
@@ -96,8 +89,8 @@ fn main(){
 						println!("error controlling player {:?}: {:?}", player, err);
 					}
 				}
-				Action::Join(player) => {
-					if let Err(err) = world.add_player(&player) {
+				Action::Join(player, sprite) => {
+					if let Err(err) = world.add_player(&player, sprite) {
 						println!("Error: can not add player {:?}: {:?}", player, err);
 						if let Err(senderr) = gameserver.send_player_error(&player, "worlderror", "invalid room or savefile") {
 							println!("Error: can not send error message to {:?}: {:?}", player, senderr);

@@ -1,9 +1,9 @@
-# Rustifarm
-This is the rust version of the asciifarm server.
+# Battilde
 
-This server is the replacement for the [python asciifarm server](https://github.com/jmdejong/asciifarm).
+A multiplayer top-down terminal shooter.
 
-To join the game you need the [asciifarm client](https://github.com/jmdejong/asciifarm-client).
+TODO: fix README
+
 
 ## About Asciifarm
 

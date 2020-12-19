@@ -4,27 +4,36 @@ use std::collections::HashMap;
 use std::io;
 
 use serde_json::{Value, json};
-use serde::{Deserialize};
+use serde::{Serialize, Deserialize};
 use unicode_categories::UnicodeCategories;
 use chrono::Utc;
 
 use crate::{
 	controls::{Control, Action},
 	server::Server,
+	sprite::Sprite,
 	PlayerId,
-	auth::{UserRegistry, LoaderError}
+	util
 };
 
-#[derive(Debug, Clone, PartialEq)]
-enum Authentication {
-	Guest,
-	Tilde,
-	Passtoken(String)
+fn is_valid_player_sprite(sprite: Sprite) -> bool {
+	let (prefix, name) = util::partition_by(&sprite.0, "_");
+	if prefix.as_str() != "player" {
+		return false;
+	}
+	let (colour, character) = util::partition_by(&name, "-");
+	let chars: Vec<char> = character.chars().collect();
+	if chars.len() != 1 || !chars[0].is_ascii_uppercase(){
+		return false;
+	}
+	return "r g b c m y lr lg lb lc lm ly g".split(' ').any(|col| col == colour);
 }
 
-#[derive(Debug)]
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all="lowercase")]
 enum Message {
-	Auth(String, Authentication, bool),
+	Introduction(String, Sprite),
 	Chat(String),
 	Input(Value)
 }
@@ -45,18 +54,17 @@ macro_rules! merr {
 pub struct GameServer {
 	players: HashMap<(usize, usize), PlayerId>,
 	connections: HashMap<PlayerId, (usize, usize)>,
-	users: Box<dyn UserRegistry>,
 	servers: Vec<Box<dyn Server>>,
+	#[allow(dead_code)]
 	admins: String
 }
 
 impl GameServer {
-	pub fn new(servers: Vec<Box<dyn Server>>, users: Box<dyn UserRegistry>, admins: String) -> GameServer {
+	pub fn new(servers: Vec<Box<dyn Server>>, admins: String) -> GameServer {
 		GameServer {
 			players: HashMap::new(),
 			connections: HashMap::new(),
 			servers,
-			users,
 			admins
 		}
 	}
@@ -74,7 +82,7 @@ impl GameServer {
 		}
 		for (serverid, messages, left) in input {
 			for (id, message) in messages {
-				match parse_message(&message) {
+				match serde_json::from_str(&message) {
 					Ok(msg) => {
 						match self.handle_message((serverid, id), msg){
 							Ok(Some(action)) => {actions.push(action);}
@@ -82,8 +90,8 @@ impl GameServer {
 							Err(err) => {let _ = self.send_error((serverid, id), &err.typ, &err.text);}
 						}
 					}
-					Err(err) => {
-						{let _ = self.send_error((serverid, id), &err.typ, &err.text);}
+					Err(_err) => {
+						{let _ = self.send_error((serverid, id), "invalidmessage", &format!("Invalid message structure: {}", &message));}
 					}
 				}
 			}
@@ -133,25 +141,25 @@ impl GameServer {
 	fn handle_message(&mut self, (serverid, connectionid): (usize, usize), msg: Message) -> Result<Option<Action>, MessageError> {
 		let id = (serverid, connectionid);
 		match msg {
-			Message::Auth(name, auth, join) => {
+			Message::Introduction(name, sprite) => {
+				if !is_valid_player_sprite(sprite.clone()) {
+					return Err(merr!(name, format!("Invalid player sprite: {}", sprite)));
+				}
 				if name.len() > 99 {
 					return Err(merr!(name, "A name can not be longer than 99 bytes"));
 				}
 				if name.len() == 0 {
 					return Err(merr!(name, "A name must have at least one character"));
 				}
-				if auth != Authentication::Tilde {
-					for chr in name.chars() {
-						if !(chr.is_letter() || chr.is_number() || chr.is_punctuation_connector()){
-							return Err(merr!(name, "A name can only contain letters, numbers and underscores"));
-						}
+				for chr in name.chars() {
+					if !(chr.is_letter() || chr.is_number() || chr.is_punctuation_connector()){
+						return Err(merr!(name, "A name can only contain letters, numbers and underscores"));
 					}
 				}
 				if self.players.contains_key(&id) {
 					return Err(merr!(action, "You can not change your name"));
 				}
 				let player = PlayerId(name);
-				self.authenticate(&player, auth.clone(), id)?;
 				if self.connections.contains_key(&player) {
 					return Err(merr!("nametaken", "Another connection to this player exists already"));
 				}
@@ -161,18 +169,7 @@ impl GameServer {
 				if let Err(_) = self.send(&player, json!(["connected", format!("successfully connected as {}", player)])){
 					return Err(merr!("server", "unable to send connected message"))
 				}
-				if auth == Authentication::Guest {
-					let _ = self.send(&player, json!([
-						"message",
-						format!("You are connected as guest account. Anyone could log in to this account. To register an account for yourself ask one of the server admins: {}", &self.admins),
-						"server"
-					]));
-				}
-				Ok(if join {
-					Some(Action::Join(player))
-				} else {
-					None
-				})
+				Ok(Some(Action::Join(player, sprite)))
 			}
 			Message::Chat(text) => {
 				let player = self.players.get(&id).ok_or(merr!(action, "Set a valid name before you send any other messages"))?.clone();
@@ -186,104 +183,7 @@ impl GameServer {
 			}
 		}
 	}
-	
-	fn authenticate(&self, player: &PlayerId, auth: Authentication, (serverid, connectionid): (usize, usize)) -> Result<(), MessageError> {
-		Ok(match auth {
-			Authentication::Guest => {
-				if self.users.user_exists(&player) {
-					return Err(merr!("registered", "This name is registered. Use another name or authenticate for this name"))
-				}
-				()
-			}
-			Authentication::Tilde => {
-				let (firstchar, username) = player.0.split_at(1);
-				if firstchar == "~" {
-					if Some(username.to_string()) != self.servers[serverid].get_name(connectionid) {
-						return Err(merr!(name, "A tilde name must match your username"));
-					}
-				}
-			}
-			Authentication::Passtoken(token) => {
-				match self.users.load_user(player) {
-					Ok(user) => {
-						if player.0 != user.name {
-							println!("Name mismatch: user entry for {:?} has name {}", player, user.name);
-							return Err(merr!("server", "name mismatch"));
-						}
-						if !user.validate_token(&token) {
-							return Err(merr!("invalidtoken", "invalid pass token"));
-						}
-						()
-					}
-					Err(LoaderError::InvalidResource(err)) => {
-						println!("failed to load user data for user '{}': {}", player, err);
-						return Err(merr!("server", "failed to load user data"))
-					}
-					Err(LoaderError::MissingResource(_)) => {
-						return Err(merr!("unregistered", "this name is not registered"))
-					}
-				}
-			}
-		})
-	}
 }
 
-
-
-fn parse_message(msg: &str) -> Result<Message, MessageError> {
-	let data: Value = serde_json::from_str(msg).map_err(|e| merr!(msg, format!("Invalid JSON: {}", e)))?;
-	let arr = data.as_array().ok_or(merr!(msg, "message not a json array"))?;
-	if arr.len() < 2 {
-		return Err(merr!(msg, "array not long enough"));
-	}
-	let arg = &arr[1];
-	let msgtype = arr[0].as_str().ok_or(merr!(msg, "first message element not a string"))?;
-	Ok(match msgtype {
-		"name" => {
-			let name = arg.as_str().ok_or(merr!(msg, "name not a string"))?.to_string();
-			Message::Auth(
-				name.clone(),
-				if name.starts_with("~") {
-					Authentication::Tilde
-				} else {
-					Authentication::Guest
-				},
-				true
-			)
-		}
-		"chat" => {
-			let text = arg.as_str().ok_or(merr!(msg, "chat text not a string"))?;
-			Message::Chat(text.to_string())
-		}
-		"input" => {
-			Message::Input(arg.clone())
-		}
-		"auth" => {
-			let name = arg.get("name").ok_or(merr!(msg, "auth message does not have name"))?.as_str().ok_or(merr!(msg, "auth name not a string"))?.to_string();
-			let typ = arg.get("type").ok_or(merr!(msg, "auth message does not have type"))?.as_str().ok_or(merr!(msg, "auth type not a string"))?;
-			let join = arg.get("join").unwrap_or(&json!(true)).as_bool().ok_or(merr!(msg, "join flag not a bool"))?;
-			Message::Auth(
-				name,
-				match typ {
-					"guest" => Authentication::Guest,
-					"tilde" => Authentication::Tilde,
-					"passtoken" => Authentication::Passtoken(
-						arg
-						.get("passtoken")
-						.ok_or(merr!(msg, "passtoken auth message does not have passtoken"))?
-						.as_str()
-						.ok_or(merr!(msg, "passtoken not a string"))?
-						.to_string()
-					),
-					_ => {return Err(merr!(msg, "invalid authentication type"))}
-				},
-				join
-			)
-		}
-		_ => {
-			return Err(merr!(msg, format!("unknown messsage type {:?}", msgtype)))
-		}
-	})
-}
 
 

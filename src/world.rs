@@ -27,23 +27,25 @@ pub struct Player {
 	pub plan: Option<Control>,
 	pub pos: Pos,
 	pub dir: Direction,
-	pub health: i64
+	pub health: i64,
+	pub sprite: Sprite
 }
 
 impl Player {
-	pub fn new(pos: Pos) -> Self {
+	pub fn new(pos: Pos, sprite: Sprite) -> Self {
 		Self {
 			plan: None,
 			pos,
 			dir: Direction::North,
-			health: 1
+			health: 1,
+			sprite
 		}
 	}
 }
 
 impl GameObject for Player {
 	fn sprite(&self) -> Option<Sprite>{
-		Some(Sprite("player".to_string()))
+		Some(self.sprite.clone())
 	}
 	fn blocking(&self) -> bool {
 		false
@@ -160,11 +162,11 @@ impl World {
 		}
 	}
 	
-	pub fn add_player(&mut self, playerid: &PlayerId) -> Result<()> {
+	pub fn add_player(&mut self, playerid: &PlayerId, sprite: Sprite) -> Result<()> {
 		if self.players.contains_key(playerid){
 			return Err(aerr!("player {} already exists", playerid));
 		}
-		self.players.insert(playerid.clone(), Player::new(self.spawnpoint));
+		self.players.insert(playerid.clone(), Player::new(self.spawnpoint, sprite));
 		Ok(())
 	}
 	
@@ -190,7 +192,8 @@ impl World {
 			)
 			.collect();
 		for playerid in dead {
-			self.players.insert(playerid, Player::new(self.spawnpoint));
+			let sprite = self.players.get(&playerid).unwrap().sprite.clone();
+			self.players.insert(playerid, Player::new(self.spawnpoint, sprite));
 		};
 		for player in self.players.values_mut() {
 			if self.ground.get(&player.pos) == Some(&Tile::Sanctuary) {
