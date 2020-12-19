@@ -1,63 +1,35 @@
 
 use std::thread::sleep;
 use std::time::Duration;
-// use std::path::PathBuf;
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use structopt::StructOpt;
 use chrono::Utc;
 
 mod server;
 mod gameserver;
-// mod room;
 mod util;
 mod controls;
-// mod components;
-// mod resources;
-// mod systems;
 mod worldmessages;
 mod pos;
-// mod componentwrapper;
-// mod parameter;
-// mod assemblage;
-// mod parameterexpression;
-// mod encyclopedia;
-// mod template;
-// mod roomtemplate;
-// mod savestate;
 mod playerid;
-// mod playerstate;
-// mod roomid;
-// mod persistence;
-// mod worldloader;
 mod world;
 mod sprite;
 mod timestamp;
-// mod purgatory;
 mod config;
-// mod item;
-// mod exchange;
 mod errors;
 mod auth;
-// mod fromtoparameter;
 
 use self::{
 	pos::Pos,
 	playerid::PlayerId,
-// 	roomid::RoomId,
-// 	item::ItemId,
 	errors::{Result},
 	sprite::Sprite,
-// 	template::Template,
-// 	encyclopedia::Encyclopedia,
 	timestamp::Timestamp,
-// 	componentwrapper::ComponentWrapper,
 	
 	gameserver::GameServer,
 	server::Server,
 	server::address::Address,
-// 	persistence::FileStorage,
 	controls::Action,
-// 	worldloader::{WorldLoader, WorldMeta},
 	world::World,
 	worldmessages::MessageCache
 };
@@ -96,29 +68,9 @@ fn main(){
 	
 	let mut gameserver = GameServer::new(servers, Box::new(users), config.admins);
 	
-// 	let content_dir = config.content_dir.unwrap_or(
-// 		PathBuf::new()
-// 			.join(std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()))
-// 			.join("content/")
-// 	);
-// 	println!("content directory: {:?}", content_dir);
-// 	let loader = WorldLoader::new(content_dir);
-// 	let WorldMeta{encyclopediae, default_room} = loader.load_world_meta().expect("Failed to load world meta information");
-// 	
-// 	let mut encyclopedia = Encyclopedia::default();
-// 	for enc in encyclopediae {
-// 		encyclopedia = encyclopedia.merge(
-// 			loader.load_encyclopedia(&enc).expect(&format!("Failed to load encyclopedia {}", enc))
-// 		)
-// 	}
-// 	
-// 	let save_dir = config.save_dir.unwrap_or(
-// 		FileStorage::default_save_dir().expect("couldn't find any save directory")
-// 	);
-// 	println!("save directory: {:?}", save_dir);
-// 	let storage = FileStorage::new(save_dir);
 
-	let mut world = World::new();//encyclopedia, loader, Box::new(storage), default_room);
+
+	let mut world = World::new();
 	
 	let mut message_cache = MessageCache::default();
 	
@@ -161,10 +113,6 @@ fn main(){
 			}
 		}
 		world.update();
-// 		if world.time.0 % config.save_interval == 0 {
-// 			world.save();
-// 			world.unload_rooms(config.unload_age);
-// 		}
 		let messages = world.view();
 		for (player, mut message) in messages {
 			message_cache.trim(&player, &mut message);
@@ -179,9 +127,6 @@ fn main(){
 		
 		sleep(Duration::from_millis(config.step_duration));
 	}
-// 	println!("saving world");
-// 	world.save();
-// 	println!("world saved");
 	println!("shutting down on {}", Utc::now());
 }
 

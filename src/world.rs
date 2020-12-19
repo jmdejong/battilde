@@ -3,14 +3,7 @@ use std::collections::HashMap;
 
 use crate::{
 	PlayerId,
-// 	RoomId,
-// 	room::{Room, RoomType},
-// 	worldloader::WorldLoader,
-// 	persistence::{PersistentStorage, LoaderError},
-// 	playerstate::{PlayerState, RoomPos},
-// 	Encyclopedia,
 	controls::{Control, Direction},
-// 	errors::{AnyError},
 	Result,
 	aerr,
 	Pos,
@@ -18,7 +11,6 @@ use crate::{
 	worldmessages::{WorldMessage, FieldMessage},
 	Timestamp,
 	util::randomize
-// 	purgatory
 };
 
 pub trait GameObject {
