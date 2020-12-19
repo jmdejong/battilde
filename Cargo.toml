@@ -1,6 +1,6 @@
 [package]
-name = "asciifarm"
-version = "0.2.0"
+name = "battilde"
+version = "0.1.0"
 authors = ["troido <troido@protonmail.com>"]
 edition = "2018"
 
@@ -11,7 +11,6 @@ slab = "0.4.2"
 nix = "0.13"
 libc = "0.2"
 users = "0.8"
-specs = { version = "0.16", features = ["specs-derive"] }
 rand = "0.7"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -20,7 +19,5 @@ structopt = "0.3"
 unicode_categories = "0.1.1"
 base64 = "0.12.0"
 ring = "0.16.12"
-strum = "0.19"
-strum_macros = "0.19"
 chrono = "0.4.17"
 json5 = "0.2.8"

@@ -53,6 +53,7 @@ impl GameObject for Player {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FloorType{
+	#[allow(dead_code)]
 	Stone,
 	Dirt,
 	Grass1,
@@ -181,7 +182,7 @@ impl World {
 	
 	
 	fn update_players(&mut self) {
-		let mut dead: Vec<PlayerId> = self.players.iter()
+		let dead: Vec<PlayerId> = self.players.iter()
 			.filter_map(|(playerid, player)|
 				if player.health <= 0 {
 					Some(playerid.clone())
@@ -217,7 +218,6 @@ impl World {
 							self.bullets.push(Bullet{direction: player.dir, pos: player.pos});
 						}
 					}
-					_ => {}
 				}
 				player.plan = None;
 			}
@@ -227,7 +227,7 @@ impl World {
 	fn update_bullets(&mut self) {
 		let players = self.player_map();
 		self.bullets = self.bullets.clone().into_iter().filter_map(|mut bullet| {
-			for i in 0..2 {
+			for _i in 0..2 {
 				bullet.pos = bullet.pos + bullet.direction;
 				if let Some(playerid) = players.get(&bullet.pos){
 					self.players.get_mut(playerid).unwrap().health -= 10;

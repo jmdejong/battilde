@@ -18,6 +18,7 @@ impl Pos {
 		Pos {x, y}
 	}
 	
+	#[allow(dead_code)]
 	pub fn from_tuple(p: (i64, i64)) -> Pos {
 		let (x, y) = p;
 		Pos {x, y}
@@ -35,6 +36,7 @@ impl Pos {
 		Pos{x: self.x.abs(), y: self.y.abs()}
 	}
 	
+	#[allow(dead_code)]
 	pub fn distance_to(&self, other: Pos) -> i64 {
 		let d = (other - *self).abs();
 		d.x + d.y

@@ -1,7 +1,6 @@
 
 
-use serde::{Serialize, Deserialize, Deserializer, de};
-use specs::Entity;
+use serde::{Serialize, Deserialize};
 use crate::{PlayerId, Pos};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

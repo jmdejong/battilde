@@ -6,7 +6,7 @@ pub fn clamp<T: Ord>(val: T, lower: T, upper: T) -> T{
 	max(min(val, upper), lower)
 }
 
-
+#[allow(dead_code)]
 pub fn strip_prefix<'a>(txt: &'a str, prefix: &'a str) -> Option<&'a str> {
 	if txt.starts_with(prefix) {
 		Some(txt.split_at(prefix.len()).1)
