@@ -22,6 +22,13 @@ use crate::{
 	aerr
 };
 
+pub fn randomize (mut seed: u32) -> u32 {
+	seed ^= seed << 13;
+	seed ^= seed >> 17;
+	seed ^= seed << 5;
+	seed
+}
+
 pub fn write_file_safe<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<(), AnyError> {
 	let temppath = path
 		.as_ref()

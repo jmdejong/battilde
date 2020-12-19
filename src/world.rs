@@ -3,230 +3,320 @@ use std::collections::HashMap;
 
 use crate::{
 	PlayerId,
-	RoomId,
-	room::{Room, RoomType},
-	worldloader::WorldLoader,
-	persistence::{PersistentStorage, LoaderError},
-	playerstate::{PlayerState, RoomPos},
-	Encyclopedia,
-	controls::Control,
-	errors::{AnyError},
+// 	RoomId,
+// 	room::{Room, RoomType},
+// 	worldloader::WorldLoader,
+// 	persistence::{PersistentStorage, LoaderError},
+// 	playerstate::{PlayerState, RoomPos},
+// 	Encyclopedia,
+	controls::{Control, Direction},
+// 	errors::{AnyError},
 	Result,
 	aerr,
-	worldmessages::WorldMessage,
+	Pos,
+	sprite::Sprite,
+	worldmessages::{WorldMessage, FieldMessage},
 	Timestamp,
-	purgatory
+	util::randomize
+// 	purgatory
 };
 
-pub struct World {
-	template_loader: WorldLoader,
-	persistence: Box<dyn PersistentStorage>,
-	default_room: RoomId,
-	players: HashMap<PlayerId, RoomId>,
-	rooms: HashMap<RoomId, Room>,
-	room_age: HashMap<RoomId, Timestamp>,
-	encyclopedia: Encyclopedia,
-	pub time: Timestamp
+pub trait GameObject {
+	
+	fn sprite(&self) -> Option<Sprite>;
+	fn blocking(&self) -> bool;
 }
 
-#[derive(Debug)]
-pub enum MigrationError {
-	PlayerError(AnyError),
-	RoomError(AnyError)
+
+const MAX_HEALTH: i64 = 100;
+
+#[derive(Debug, Clone)]
+pub struct Player {
+	pub plan: Option<Control>,
+	pub pos: Pos,
+	pub dir: Direction,
+	pub health: i64
+}
+
+impl Player {
+	pub fn new(pos: Pos) -> Self {
+		Self {
+			plan: None,
+			pos,
+			dir: Direction::North,
+			health: 1
+		}
+	}
+}
+
+impl GameObject for Player {
+	fn sprite(&self) -> Option<Sprite>{
+		Some(Sprite("player".to_string()))
+	}
+	fn blocking(&self) -> bool {
+		false
+	}
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FloorType{
+	Stone,
+	Dirt,
+	Grass1,
+	Grass2,
+	Grass3
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tile {
+	Floor(FloorType),
+	Sanctuary,
+	Gate,
+	Wall
+}
+
+impl GameObject for Tile {
+	fn sprite(&self) -> Option<Sprite>{
+		Some(Sprite(match self {
+			Tile::Floor(FloorType::Stone) => "floor",
+			Tile::Floor(FloorType::Dirt) => "ground",
+			Tile::Floor(FloorType::Grass1) => "grass1",
+			Tile::Floor(FloorType::Grass2) => "grass2",
+			Tile::Floor(FloorType::Grass3) => "grass3",
+			Tile::Gate => "gate",
+			Tile::Sanctuary => "sanctuary",
+			Tile::Wall => "wall"
+		}.to_string()))
+	}
+	fn blocking(&self) -> bool {
+		match self {
+			Tile::Floor(_) => false,
+			Tile::Sanctuary => false,
+			Tile::Wall => true,
+			Tile::Gate => true
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct Bullet{
+	direction: Direction,
+	pos: Pos
+}
+
+impl GameObject for Bullet {
+	fn sprite(&self) -> Option<Sprite>{
+		Some(Sprite("bullet".to_string()))
+	}
+	fn blocking(&self) -> bool {
+		false
+	}
+}
+
+pub struct World {
+	pub time: Timestamp,
+	size: (i64, i64),
+	ground: HashMap<Pos, Tile>,
+	players: HashMap<PlayerId, Player>,
+	bullets: Vec<Bullet>,
+	spawnpoint: Pos
 }
 
 impl World {
 	
-	pub fn new(encyclopedia: Encyclopedia, template_loader: WorldLoader, persistence: Box<dyn PersistentStorage>, default_room: RoomId) -> Self {
-		let time = match persistence.load_world_meta() {
-			Ok(time) => {time}
-			Err(LoaderError::MissingResource(_)) => {
-				Timestamp(1000000)
-			}
-			Err(LoaderError::InvalidResource(err)) => {
-				panic!("Invalid world meta: {:?}", err)
-			}
-		};
-		World {
-			template_loader,
-			time,
-			persistence,
-			default_room,
-			encyclopedia: encyclopedia,
-			players: HashMap::new(),
-			rooms: HashMap::new(),
-			room_age: HashMap::new()
-		}
-	}
-	
-	fn get_room_mut(&mut self, id: &RoomId) -> Result<&mut Room> {
-		self.room_age.insert(id.clone(), self.time);
-		let result = self.get_room_mut_(id);
-		if let Err(err) = &result {
-			println!("Failed to load room {:?}: {:?}", id, err);
-		}
-		result
-	}
-	
-	fn get_room_mut_(&mut self, id: &RoomId) -> Result<&mut Room> {
-		if !self.rooms.contains_key(id){
-			println!("loading room '{}'", id);
-			let mut room: Room = if id == &purgatory::purgatory_id() {
-					purgatory::create_purgatory(&self.encyclopedia)
+	pub fn new() -> Self {
+		
+		let size = (64, 64);
+		let spawnpoint = Pos::new(size.0 / 2, size.1 / 2);
+		let mut ground = HashMap::new();
+		for x in 0..size.0 {
+			for y in 0..size.1 {
+				let dspawn = (Pos::new(x, y) - spawnpoint).abs();
+				let floor = if dspawn.x <= 4 && dspawn.y <= 4 {
+					Tile::Sanctuary
+				} else if dspawn.x <= 5 && dspawn.y <= 5 {
+					Tile::Gate
+				} else if dspawn.x <= 2 || dspawn.y <= 2 {
+					Tile::Floor(FloorType::Dirt)
 				} else {
-					let mut room = Room::new(id.clone(), self.encyclopedia.clone(), RoomType::Normal);
-					let template = self.template_loader.load_room(id.clone())?;
-					room.load_from_template(&template)?;
-					room
+					Tile::Floor([FloorType::Grass1, FloorType::Grass2, FloorType::Grass3][randomize(x as u32 + randomize(y as u32)) as usize % 3])
 				};
-			match self.persistence.load_room(id.clone()){
-				Ok(state) => {
-					room.load_saved(&state);
-				}
-				Err(LoaderError::MissingResource(_)) => {}
-				Err(LoaderError::InvalidResource(err)) => {return Err(err);}
+				ground.insert(Pos::new(x, y), floor);
 			}
-			let last_time = self.time - 1;
-			if room.get_time() < last_time {
-				room.update(last_time);
-			}
-			self.rooms.insert(id.clone(), room);
 		}
-		Ok(self.rooms.get_mut(id).expect("can't get room after loading it"))
-	}
-	
-	fn add_loaded_player(&mut self, state: PlayerState) -> std::result::Result<(), MigrationError> {
-		let roomid = state.clone().room.unwrap_or_else(|| self.default_room.clone());
-		let room = self.get_room_mut(&roomid).map_err(|e| MigrationError::RoomError(e))?;
-		room.add_player(&state).map_err(|e| MigrationError::PlayerError(e))?;
-		self.players.insert(state.id, roomid);
-		Ok(())
-	}
-	
-	fn try_add_loaded_player(&mut self, mut state: PlayerState, backups: &[Option<RoomId>]) -> Result<()> {
-		match self.add_loaded_player(state.clone()){
-			Err(MigrationError::RoomError(e)) => {
-				println!("could not add player {:?} to room {:?}: {}", state.id, state.room, e);
-				if let Some((first, rest)) = backups.split_first(){
-					state.room = first.clone();
-					state.pos = RoomPos::Unknown;
-					self.try_add_loaded_player(state, rest)
-				} else {
-					Err(e)
-				}
-			}
-			Err(MigrationError::PlayerError(e)) => {
-				println!("could not load player {:?} to room {:?}: {:?}", state.id, state.room, e);
-				Err(e)
-			}
-			Ok(()) => Ok(())
+		let p: Vec<(i64, i64)> = vec![(5, 5), (5, 4), (5, 3), (5, 2), (4, 4)];
+		for (x, y) in p {
+			ground.insert(spawnpoint + Pos::new(x, y), Tile::Wall);
+			ground.insert(spawnpoint + Pos::new(-x, -y), Tile::Wall);
+			ground.insert(spawnpoint + Pos::new(x, -y), Tile::Wall);
+			ground.insert(spawnpoint + Pos::new(-x, y), Tile::Wall);
+			ground.insert(spawnpoint + Pos::new(y, x), Tile::Wall);
+			ground.insert(spawnpoint + Pos::new(-y, -x), Tile::Wall);
+			ground.insert(spawnpoint + Pos::new(y, -x), Tile::Wall);
+			ground.insert(spawnpoint + Pos::new(-y, x), Tile::Wall);
+		}
+		
+		World {
+			size,
+			spawnpoint,
+			ground,
+			players: HashMap::new(),
+			bullets: Vec::new(),
+			time: Timestamp(0)
 		}
 	}
 	
 	pub fn add_player(&mut self, playerid: &PlayerId) -> Result<()> {
-		let mut state = match self.persistence.load_player(playerid.clone()) {
-			Ok(state) => {state}
-			Err(LoaderError::MissingResource(_)) => {
-				PlayerState::new(playerid.clone())
-			}
-			Err(LoaderError::InvalidResource(err)) => {
-				return Err(err)
-			}
-		};
-		state.id = playerid.clone();
-		if state.room == Some(purgatory::purgatory_id()){
-			state.respawn();
+		if self.players.contains_key(playerid){
+			return Err(aerr!("player {} already exists", playerid));
 		}
-		
-		self.try_add_loaded_player(state, &[None])
-	}
-	
-	fn discorporate_player(&mut self, playerid: &PlayerId) -> Result<PlayerState> {
-		let roomid = self.players.remove(playerid).ok_or(aerr!("player not found"))?;
-		let room = self.get_room_mut(&roomid)?;
-		room.remove_player(playerid)
+		self.players.insert(playerid.clone(), Player::new(self.spawnpoint));
+		Ok(())
 	}
 	
 	pub fn remove_player(&mut self, playerid: &PlayerId) -> Result<()> {
-		let player_state = self.discorporate_player(playerid)?;
-		self.persistence.save_player(playerid.clone(), player_state)?;
+		self.players.remove(playerid).ok_or(aerr!("player {} not found", playerid))?;
 		Ok(())
 	}
 	
 	
-	pub fn control_player(&mut self, player: PlayerId, control: Control) -> Result<()>{
-		let roomid = self.players.get(&player).ok_or(aerr!("player not found"))?.clone();
-		self.get_room_mut(&roomid)?.control_player(player, control);
+	pub fn control_player(&mut self, playerid: PlayerId, control: Control) -> Result<()>{
+		let player = self.players.get_mut(&playerid).ok_or(aerr!("player not found"))?;
+		player.plan = Some(control);
 		Ok(())
 	}
 	
-	fn migrate_player(&mut self, player: &PlayerId, destination: RoomId, roompos: RoomPos) -> Result<()> {
-		let mut state = self.discorporate_player(player)?;
-		let old_room = state.room;
-		state.room = Some(destination);
-		state.pos = roompos;
-		self.try_add_loaded_player(state, &[old_room, None])
+	
+	fn update_players(&mut self) {
+		let mut dead: Vec<PlayerId> = self.players.iter()
+			.filter_map(|(playerid, player)|
+				if player.health <= 0 {
+					Some(playerid.clone())
+				} else {None}
+			)
+			.collect();
+		for playerid in dead {
+			self.players.insert(playerid, Player::new(self.spawnpoint));
+		};
+		for player in self.players.values_mut() {
+			if self.ground.get(&player.pos) == Some(&Tile::Sanctuary) {
+				player.health += 4;
+				if player.health > MAX_HEALTH {
+					player.health = MAX_HEALTH;
+				}
+			}
+			if let Some(plan) = &player.plan{
+				match plan {
+					Control::Move(direction) => {
+						player.dir = *direction;
+						let newpos = player.pos + *direction;
+						if let Some(tile) = self.ground.get(&newpos) {
+							if !tile.blocking() || tile == &Tile::Gate && self.ground.get(&player.pos) == Some(&Tile::Sanctuary){
+								player.pos = newpos;
+							}
+						}
+					}
+					Control::Shoot(dir) => {
+						if let Some(direction) = dir {
+							player.dir = *direction;
+						}
+						if !self.ground.get(&player.pos).unwrap().blocking(){
+							self.bullets.push(Bullet{direction: player.dir, pos: player.pos});
+						}
+					}
+					_ => {}
+				}
+				player.plan = None;
+			}
+		}
 	}
 	
+	fn update_bullets(&mut self) {
+		let players = self.player_map();
+		self.bullets = self.bullets.clone().into_iter().filter_map(|mut bullet| {
+			for i in 0..2 {
+				bullet.pos = bullet.pos + bullet.direction;
+				if let Some(playerid) = players.get(&bullet.pos){
+					self.players.get_mut(playerid).unwrap().health -= 10;
+					return None;
+				}
+				if let Some(tile) = self.ground.get(&bullet.pos) {
+					if tile.blocking(){
+						return None;
+					}
+				}
+			}
+			Some(bullet)
+		}).collect();
+	}
+	
+	fn player_map(&self) -> HashMap<Pos, PlayerId> {
+		self.players.iter().map(|(playerid, player)| (player.pos, playerid.clone())).collect()
+	}
 	
 	pub fn update(&mut self) {
-		self.migrate();
-		for room in self.rooms.values_mut() {
-			room.update(self.time);
-		}
+		self.update_bullets();
+		self.update_players();
 		self.time.0 += 1;
 	}
 	
-	fn migrate(&mut self) {
-		let mut migrants = Vec::new();
-		for room in self.rooms.values_mut() {
-			migrants.append(&mut room.emigrate());
-		}
-		for (player, destination, roompos) in migrants {
-			self.migrate_player(&player, destination, roompos).unwrap();
-		}
-	}
 	
-	pub fn save(&self) {
-		for room in self.rooms.values() {
-			if let Err(err) = self.persistence.save_room(room.id.clone(), room.save()) {
-				println!("{:?}",err);
-			}
-			for (playerid, state) in room.save_players() {
-				if let Err(err) = self.persistence.save_player(playerid.clone(), state.clone()) {
-					println!("{:?}",err);
-				}
-			}
-		}
-		if let Err(err) = self.persistence.save_world_meta(self.time) {
-			println!("{:?}",err);
-		}
-	}
-	
-	pub fn unload_rooms(&mut self, min_age: i64){
-		let mut to_remove = Vec::new();
-		for roomid in self.rooms.keys() {
-			if self.rooms[roomid].has_players() {
-				self.room_age.insert(roomid.clone(), self.time);
-			} else {
-				let age = self.time - *self.room_age.get(&roomid).unwrap_or(&Timestamp(0));
-				if age >= min_age {
-					to_remove.push(roomid.clone());
-				}
+	fn draw(&self) -> FieldMessage {
+		let mut sprites: HashMap<Pos, Vec<Sprite>> = self.ground.iter()
+			.filter_map(|(pos, tile)| Some((*pos, vec![tile.sprite()?])))
+			.collect();
+		for bullet in self.bullets.iter() {
+			if let Some(sprite) = bullet.sprite(){
+				sprites.entry(bullet.pos).or_insert(Vec::new()).insert(0, sprite.clone());
+				sprites.entry(bullet.pos + bullet.direction).or_insert(Vec::new()).insert(0, sprite);
 			}
 		}
-		for roomid in to_remove {
-			println!("unloading room '{}'", roomid);
-			self.rooms.remove(&roomid);
+		for player in self.players.values() {
+			if let Some(sprite) = player.sprite(){
+				sprites.entry(player.pos).or_insert(Vec::new()).insert(0, sprite);
+			}
+		}
+		
+		let (width, height) = self.size;
+		let size = width * height;
+		let mut values :Vec<usize> = Vec::with_capacity(size as usize);
+		let mut mapping: Vec<Vec<Sprite>> = Vec::new();
+		let emptyvec = Vec::new();
+		for y in 0..height {
+			for x in 0..width {
+				let sprs: &Vec<Sprite> = sprites.get(&Pos{x, y}).unwrap_or(&emptyvec);
+				values.push(
+					match mapping.iter().position(|x| x == sprs) {
+						Some(index) => {
+							index
+						}
+						None => {
+							mapping.push(sprs.to_vec());
+							mapping.len() - 1
+						}
+					}
+				)
+			}
+		}
+		
+		FieldMessage {
+			width: self.size.0,
+			height: self.size.1,
+			field: values,
+			mapping
 		}
 	}
 	
 	pub fn view(&self) -> HashMap<PlayerId, WorldMessage> {
-		let mut views = HashMap::new();
-		for room in self.rooms.values() {
-			for (player, message) in room.view().into_iter() {
-				views.insert(player, message);
-			}
+		let fm = self.draw();
+		let mut views: HashMap<PlayerId, WorldMessage> = HashMap::new();
+		for (playerid, player) in self.players.iter() {
+			let mut wm = WorldMessage::default();
+			wm.field = Some(fm.clone());
+			wm.pos = Some(player.pos);
+			wm.health = Some((player.health, MAX_HEALTH));
+			views.insert(playerid.clone(), wm);
 		}
 		views
 	}

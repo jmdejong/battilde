@@ -3,6 +3,7 @@
 use std::ops::{Add, Sub};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use crate::util::clamp;
+use crate::controls::Direction;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Default)]
 pub struct Pos {
@@ -30,9 +31,13 @@ impl Pos {
 		}
 	}
 	
+	pub fn abs(self) -> Pos {
+		Pos{x: self.x.abs(), y: self.y.abs()}
+	}
+	
 	pub fn distance_to(&self, other: Pos) -> i64 {
-		let d = other - *self;
-		d.x.abs() + d.y.abs()
+		let d = (other - *self).abs();
+		d.x + d.y
 	}
 }
 
@@ -55,6 +60,18 @@ impl Add<Pos> for Pos {
 	type Output = Pos;
 
 	fn add(self, other: Pos) -> Pos {
+		Pos {
+			x: self.x + other.x,
+			y: self.y + other.y
+		}
+	}
+}
+
+impl Add<Direction> for Pos {
+	type Output = Pos;
+
+	fn add(self, dir: Direction) -> Pos {
+		let other = dir.to_position();
 		Pos {
 			x: self.x + other.x,
 			y: self.y + other.y
