@@ -3,24 +3,20 @@ use std::collections::HashMap;
 
 use crate::{
 	PlayerId,
-	controls::{Control, Direction},
+	controls::Control,
 	Result,
 	aerr,
 	Pos,
+	Direction,
 	sprite::Sprite,
 	worldmessages::{WorldMessage, FieldMessage},
 	Timestamp,
 	util::randomize
 };
 
-pub trait GameObject {
-	
-	fn sprite(&self) -> Option<Sprite>;
-	fn blocking(&self) -> bool;
-}
 
+const MAX_PLAYER_HEALTH: i64 = 100;
 
-const MAX_HEALTH: i64 = 100;
 
 #[derive(Debug, Clone)]
 pub struct Player {
@@ -43,15 +39,6 @@ impl Player {
 	}
 }
 
-impl GameObject for Player {
-	fn sprite(&self) -> Option<Sprite>{
-		Some(self.sprite.clone())
-	}
-	fn blocking(&self) -> bool {
-		false
-	}
-}
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FloorType{
@@ -71,9 +58,9 @@ pub enum Tile {
 	Wall
 }
 
-impl GameObject for Tile {
-	fn sprite(&self) -> Option<Sprite>{
-		Some(Sprite(match self {
+impl Tile {
+	fn sprite(&self) -> Sprite{
+		Sprite(match self {
 			Tile::Floor(FloorType::Stone) => "floor",
 			Tile::Floor(FloorType::Dirt) => "ground",
 			Tile::Floor(FloorType::Grass1) => "grass1",
@@ -82,7 +69,7 @@ impl GameObject for Tile {
 			Tile::Gate => "gate",
 			Tile::Sanctuary => "sanctuary",
 			Tile::Wall => "wall"
-		}.to_string()))
+		}.to_string())
 	}
 	fn blocking(&self) -> bool {
 		match self {
@@ -97,15 +84,27 @@ impl GameObject for Tile {
 #[derive(Debug, Clone)]
 pub struct Bullet{
 	direction: Direction,
-	pos: Pos
+	pos: Pos,
+	range: i64,
+	damage: i64
 }
 
-impl GameObject for Bullet {
-	fn sprite(&self) -> Option<Sprite>{
-		Some(Sprite("bullet".to_string()))
+impl Bullet {
+	fn sprite(&self) -> Sprite{
+		Sprite("bullet".to_string())
 	}
-	fn blocking(&self) -> bool {
-		false
+}
+
+#[derive(Debug, Clone)]
+pub struct Zombie{
+	pos: Pos,
+	health: i64,
+	cooldown: i64
+}
+
+impl Zombie {
+	fn sprite(&self) -> Sprite{
+		Sprite("zombie".to_string())
 	}
 }
 
@@ -115,7 +114,9 @@ pub struct World {
 	ground: HashMap<Pos, Tile>,
 	players: HashMap<PlayerId, Player>,
 	bullets: Vec<Bullet>,
-	spawnpoint: Pos
+	monsters: Vec<Zombie>,
+	spawnpoint: Pos,
+	monsterspawn: Vec<Pos>,
 }
 
 impl World {
@@ -157,8 +158,10 @@ impl World {
 			spawnpoint,
 			ground,
 			players: HashMap::new(),
+			monsters: Vec::new(),
 			bullets: Vec::new(),
-			time: Timestamp(0)
+			time: Timestamp(0),
+			monsterspawn: vec![Pos::new(0,0), Pos::new(size.0-1, 0), Pos::new(0, size.1-1), Pos::new(size.0-1, size.1-1)]
 		}
 	}
 	
@@ -198,8 +201,8 @@ impl World {
 		for player in self.players.values_mut() {
 			if self.ground.get(&player.pos) == Some(&Tile::Sanctuary) {
 				player.health += 4;
-				if player.health > MAX_HEALTH {
-					player.health = MAX_HEALTH;
+				if player.health > MAX_PLAYER_HEALTH {
+					player.health = MAX_PLAYER_HEALTH;
 				}
 			}
 			if let Some(plan) = &player.plan{
@@ -218,7 +221,7 @@ impl World {
 							player.dir = *direction;
 						}
 						if !self.ground.get(&player.pos).unwrap().blocking(){
-							self.bullets.push(Bullet{direction: player.dir, pos: player.pos});
+							self.bullets.push(Bullet{direction: player.dir, pos: player.pos, range: 32, damage: 10});
 						}
 					}
 				}
@@ -228,12 +231,23 @@ impl World {
 	}
 	
 	fn update_bullets(&mut self) {
-		let players = self.player_map();
+		let players: HashMap<Pos, PlayerId> = self.players.iter().map(|(playerid, player)| (player.pos, playerid.clone())).collect();
+		let monsters: HashMap<Pos, usize> = self.monsters.iter().enumerate().map(|(monsterid, monster)| (monster.pos, monsterid)).collect();
 		self.bullets = self.bullets.clone().into_iter().filter_map(|mut bullet| {
 			for _i in 0..2 {
+				if bullet.range == 0 {
+					return None;
+				}
 				bullet.pos = bullet.pos + bullet.direction;
 				if let Some(playerid) = players.get(&bullet.pos){
-					self.players.get_mut(playerid).unwrap().health -= 10;
+					self.players.get_mut(playerid).unwrap().health -= bullet.damage;
+					return None;
+				}
+				if let Some(monsterid) = monsters.get(&bullet.pos){
+					self.monsters[*monsterid].health -= bullet.damage;
+					if self.monsters[*monsterid].health <= 0 {
+						self.monsters.remove(*monsterid);
+					}
 					return None;
 				}
 				if let Some(tile) = self.ground.get(&bullet.pos) {
@@ -246,31 +260,76 @@ impl World {
 		}).collect();
 	}
 	
-	fn player_map(&self) -> HashMap<Pos, PlayerId> {
-		self.players.iter().map(|(playerid, player)| (player.pos, playerid.clone())).collect()
+	fn update_monsters(&mut self){
+		for monster in self.monsters.iter_mut() {
+			if monster.cooldown > 0 {
+				monster.cooldown -= 1;
+				continue;
+			}
+			monster.cooldown = 2;
+			let mut target = None;
+			for player in self.players.values() {
+				if let Some(target_pos) = target {
+					if monster.pos.distance_to(player.pos) < monster.pos.distance_to(target_pos) {
+						target = Some(player.pos)
+					}
+				} else {
+					target = Some(player.pos)
+				}
+			}
+			if let Some(target_pos) = target {
+				let mut dirs = monster.pos.directions_to(target_pos);
+				if monster.pos.distance_to(target_pos) == 1 {
+					let dir = dirs[0];
+					self.bullets.push(Bullet{direction: dir, pos: monster.pos, range: 1, damage: 10});
+				} else {
+					if dirs.len() == 0 {
+						dirs = vec![Direction::North, Direction::South, Direction::East, Direction::West];
+					}
+					for dir in dirs{
+						let newpos = monster.pos + dir;
+						if let Some(tile) = self.ground.get(&newpos) {
+							if !tile.blocking() {
+								monster.pos = newpos;
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 	
 	pub fn update(&mut self) {
 		self.update_bullets();
 		self.update_players();
+		if self.time.0 % 3 == 0 {
+			self.update_monsters();
+		}
+		if self.time.0 % 10 == 0 && self.monsters.len() < 4 {
+			self.monsters.push(Zombie {
+				pos: self.monsterspawn[randomize(self.time.0 as u32) as usize % self.monsterspawn.len()],
+				health: 20,
+				cooldown: 1
+			})
+		}
 		self.time.0 += 1;
 	}
 	
 	
 	fn draw(&self) -> FieldMessage {
 		let mut sprites: HashMap<Pos, Vec<Sprite>> = self.ground.iter()
-			.filter_map(|(pos, tile)| Some((*pos, vec![tile.sprite()?])))
+			.map(|(pos, tile)| (*pos, vec![tile.sprite()]))
 			.collect();
+		for monster in self.monsters.iter() {
+			sprites.entry(monster.pos).or_insert(Vec::new()).insert(0, monster.sprite());
+		}
 		for bullet in self.bullets.iter() {
-			if let Some(sprite) = bullet.sprite(){
-				sprites.entry(bullet.pos).or_insert(Vec::new()).insert(0, sprite.clone());
-				sprites.entry(bullet.pos + bullet.direction).or_insert(Vec::new()).insert(0, sprite);
-			}
+			sprites.entry(bullet.pos).or_insert(Vec::new()).insert(0, bullet.sprite());
+			sprites.entry(bullet.pos + bullet.direction).or_insert(Vec::new()).insert(0, bullet.sprite());
 		}
 		for player in self.players.values() {
-			if let Some(sprite) = player.sprite(){
-				sprites.entry(player.pos).or_insert(Vec::new()).insert(0, sprite);
-			}
+			sprites.entry(player.pos).or_insert(Vec::new()).insert(0, player.sprite.clone());
 		}
 		
 		let (width, height) = self.size;
@@ -310,7 +369,7 @@ impl World {
 			let mut wm = WorldMessage::default();
 			wm.field = Some(fm.clone());
 			wm.pos = Some(player.pos);
-			wm.health = Some((player.health, MAX_HEALTH));
+			wm.health = Some((player.health, MAX_PLAYER_HEALTH));
 			views.insert(playerid.clone(), wm);
 		}
 		views

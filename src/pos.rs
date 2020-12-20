@@ -3,7 +3,29 @@
 use std::ops::{Add, Sub};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use crate::util::clamp;
-use crate::controls::Direction;
+
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all="lowercase")]
+pub enum Direction {
+	North,
+	South,
+	East,
+	West
+}
+
+impl Direction {
+	
+	pub fn to_position(self) -> Pos {
+		match self {
+			Direction::North => Pos::new(0, -1),
+			Direction::South => Pos::new(0, 1),
+			Direction::East => Pos::new(1, 0),
+			Direction::West => Pos::new(-1, 0)
+		}
+	}
+}
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Default)]
 pub struct Pos {
@@ -36,10 +58,30 @@ impl Pos {
 		Pos{x: self.x.abs(), y: self.y.abs()}
 	}
 	
-	#[allow(dead_code)]
+	pub fn size(&self) -> i64 {
+		self.x.abs() + self.y.abs()
+	}
+	
 	pub fn distance_to(&self, other: Pos) -> i64 {
-		let d = (other - *self).abs();
-		d.x + d.y
+		(other - *self).size()
+	}
+	
+	pub fn directions_to(&self, other: Pos) -> Vec<Direction> {
+		let mut directions = Vec::new();
+		let d = other - *self;
+		if d.x > 0 {
+			directions.push(Direction::East);
+		}
+		if d.x < 0 {
+			directions.push(Direction::West);
+		}
+		if d.y > 0 {
+			directions.push(Direction::South);
+		}
+		if d.y < 0 {
+			directions.push(Direction::North);
+		}
+		directions
 	}
 }
 
@@ -57,6 +99,7 @@ impl<'de> Deserialize<'de> for Pos {
 		Ok(Self{x, y})
 	}
 }
+
 
 impl Add<Pos> for Pos {
 	type Output = Pos;
@@ -91,4 +134,6 @@ impl Sub<Pos> for Pos {
 		}
 	}
 }
+
+
 

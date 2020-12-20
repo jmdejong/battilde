@@ -19,7 +19,7 @@ mod config;
 mod errors;
 
 use self::{
-	pos::Pos,
+	pos::{Pos, Direction},
 	playerid::PlayerId,
 	errors::{Result},
 	sprite::Sprite,
