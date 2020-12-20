@@ -294,6 +294,9 @@ impl World {
 	}
 	
 	fn update_creatures(&mut self) {
+		let mut creature_map: HashMap<Pos, usize> = self.creatures.iter()
+			.map(|(creatureid, creature)| (creature.pos, *creatureid))
+			.collect();
 		let plans: HashMap<usize, Control> = self.creatures.iter().filter_map(|(k, c)|Some((*k, self.creature_plan(c)?))).collect();
 		for (id, creature) in self.creatures.iter_mut() {
 			if self.ground.get(&creature.pos) == Some(&Tile::Sanctuary) {
@@ -312,7 +315,14 @@ impl World {
 					creature.dir = *direction;
 					let newpos = creature.pos + *direction;
 					if let Some(tile) = self.ground.get(&newpos) {
-						if !tile.blocking() || tile == &Tile::Gate && self.ground.get(&creature.pos) == Some(&Tile::Sanctuary){
+						if (
+									!tile.blocking() ||
+									tile == &Tile::Gate && self.ground.get(&creature.pos) == Some(&Tile::Sanctuary)) &&
+								!creature_map.contains_key(&newpos){
+							if creature_map.get(&creature.pos) == Some(id){
+								creature_map.remove(&creature.pos);
+							}
+							creature_map.insert(newpos, *id);
 							creature.pos = newpos;
 						}
 					}
@@ -340,7 +350,7 @@ impl World {
 	
 	
 	fn update_bullets(&mut self) {
-		let creatures: HashMap<Pos, usize> = self.creatures.iter()
+		let creature_map: HashMap<Pos, usize> = self.creatures.iter()
 			.map(|(creatureid, creature)| (creature.pos, *creatureid))
 			.collect();
 		self.bullets = self.bullets.clone().into_iter().filter_map(|mut bullet| {
@@ -365,7 +375,7 @@ impl World {
 					bullet.pos = bullet.pos + bullet.direction;
 					self.particles.insert(bullet.pos, bullet.ammo.sprite.clone());
 				}
-				if let Some(creatureid) = creatures.get(&bullet.pos){
+				if let Some(creatureid) = creature_map.get(&bullet.pos){
 					if let Some(creature) = self.creatures.get_mut(creatureid){
 						if creature.alignment != bullet.alignment {
 							creature.health -= bullet.ammo.damage;
