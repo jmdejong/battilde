@@ -13,7 +13,11 @@ use crate::{
 	sprite::Sprite,
 	worldmessages::{WorldMessage, FieldMessage},
 	Timestamp,
-	util::randomize
+	util::randomize,
+	creature::{Creature, Mind},
+	tile::Tile,
+	bullet::Bullet,
+	tile::FloorType
 };
 
 
@@ -22,141 +26,6 @@ pub struct Player {
 	pub plan: Option<Control>,
 	pub sprite: Sprite,
 	pub body: usize
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Mind {
-	Player(PlayerId),
-	Zombie
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Alignment {
-	#[allow(dead_code)]
-	Players,
-	Player(PlayerId),
-	Monsters
-}
-
-#[derive(Debug, Clone)]
-pub struct Ammo {
-	pub damage: i64,
-	pub range: i64,
-	pub sprite: Sprite,
-	pub speed: i64,
-	pub aim: i64,
-	pub spread: i64
-}
-
-#[derive(Debug, Clone)]
-pub struct Creature {
-	pub mind: Mind,
-	pub pos: Pos,
-	pub dir: Direction,
-	pub health: i64,
-	pub cooldown: i64,
-	pub max_cooldown: i64,
-	pub max_health: i64,
-	pub sprite: Sprite,
-	pub alignment: Alignment,
-	pub ammo: Ammo
-}
-
-impl Creature {
-	pub fn new_player(playerid: PlayerId, sprite: Sprite, pos: Pos) -> Self {
-		Self {
-			mind: Mind::Player(playerid.clone()),
-			pos,
-			dir: Direction::North,
-			health: 1,
-			max_health: 100,
-			cooldown: 0,
-			max_cooldown: 0,
-			sprite,
-			ammo: Ammo {
-				damage: 10,
-				range: 32,
-				speed: 2,
-				sprite: Sprite("bullet".to_string()),
-				aim: 10,
-				spread: 1
-			},
-			alignment: Alignment::Player(playerid)
-		}
-	}
-	
-	pub fn new_zombie(pos: Pos) -> Self {
-		Self {
-			mind: Mind::Zombie,
-			pos,
-			dir: Direction::North,
-			health: 20,
-			max_health: 20,
-			cooldown: rand::random::<i64>() % 3,
-			max_cooldown: 2,
-			sprite: Sprite("zombie".to_string()),
-			ammo: Ammo {
-				damage: 10,
-				range: 1,
-				speed: 2,
-				sprite: Sprite("bite".to_string()),
-				aim: 10,
-				spread: 10
-			},
-			alignment: Alignment::Monsters
-		}
-	}
-}
-
-
-#[derive(Debug, Clone)]
-pub struct Bullet{
-	direction: Direction,
-	pos: Pos,
-	alignment: Alignment,
-	ammo: Ammo
-}
-
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FloorType{
-	#[allow(dead_code)]
-	Stone,
-	Dirt,
-	Grass1,
-	Grass2,
-	Grass3
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Tile {
-	Floor(FloorType),
-	Sanctuary,
-	Gate,
-	Wall
-}
-
-impl Tile {
-	fn sprite(&self) -> Sprite{
-		Sprite(match self {
-			Tile::Floor(FloorType::Stone) => "floor",
-			Tile::Floor(FloorType::Dirt) => "ground",
-			Tile::Floor(FloorType::Grass1) => "grass1",
-			Tile::Floor(FloorType::Grass2) => "grass2",
-			Tile::Floor(FloorType::Grass3) => "grass3",
-			Tile::Gate => "gate",
-			Tile::Sanctuary => "sanctuary",
-			Tile::Wall => "wall"
-		}.to_string())
-	}
-	fn blocking(&self) -> bool {
-		match self {
-			Tile::Floor(_) => false,
-			Tile::Sanctuary => false,
-			Tile::Wall => true,
-			Tile::Gate => true
-		}
-	}
 }
 
 
@@ -258,7 +127,7 @@ impl World {
 				// find nearest attackable target
 				let mut target = None;
 				for player in self.creatures.values() {
-					if player.alignment != creature.alignment{
+					if player.alignment != creature.alignment && !(self.ground.get(&player.pos) == Some(&Tile::Sanctuary)){
 						if let Some(target_pos) = target {
 							if creature.pos.distance_to(player.pos) < creature.pos.distance_to(target_pos) {
 								target = Some(player.pos);
@@ -317,8 +186,8 @@ impl World {
 					if let Some(tile) = self.ground.get(&newpos) {
 						if (
 									!tile.blocking() ||
-									tile == &Tile::Gate && self.ground.get(&creature.pos) == Some(&Tile::Sanctuary)) &&
-								!creature_map.contains_key(&newpos){
+									tile == &Tile::Gate && self.ground.get(&creature.pos) == Some(&Tile::Sanctuary) && creature.health >= creature.max_health) &&
+								!creature_map.contains_key(&newpos) {
 							if creature_map.get(&creature.pos) == Some(id){
 								creature_map.remove(&creature.pos);
 							}
@@ -398,8 +267,8 @@ impl World {
 	
 	pub fn update(&mut self) {
 		self.particles.clear();
-		self.update_bullets();
 		self.update_creatures();
+		self.update_bullets();
 		if self.time.0 % 10 == 0 && self.creatures.len() - self.players.len() < 8 {
 			self.creatures.insert(Creature::new_zombie(
 				self.monsterspawn[randomize(self.time.0 as u32) as usize % self.monsterspawn.len()],

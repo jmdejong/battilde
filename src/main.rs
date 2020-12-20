@@ -18,6 +18,9 @@ mod timestamp;
 mod config;
 mod errors;
 mod holder;
+mod bullet;
+mod creature;
+mod tile;
 
 use self::{
 	pos::{Pos, Direction},
