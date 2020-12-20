@@ -1,7 +1,6 @@
 
 use std::collections::HashMap;
-use rand::seq::SliceRandom;
-use rand::thread_rng;
+use rand::{Rng, thread_rng, seq::SliceRandom};
 
 use crate::{
 	PlayerId,
@@ -40,6 +39,16 @@ pub enum Alignment {
 }
 
 #[derive(Debug, Clone)]
+pub struct Ammo {
+	pub damage: i64,
+	pub range: i64,
+	pub sprite: Sprite,
+	pub speed: i64,
+	pub aim: i64,
+	pub spread: i64
+}
+
+#[derive(Debug, Clone)]
 pub struct Creature {
 	pub mind: Mind,
 	pub pos: Pos,
@@ -50,9 +59,7 @@ pub struct Creature {
 	pub max_health: i64,
 	pub sprite: Sprite,
 	pub alignment: Alignment,
-	pub damage: i64,
-	pub range: i64,
-	pub bullet_sprite: Sprite
+	pub ammo: Ammo
 }
 
 impl Creature {
@@ -66,9 +73,14 @@ impl Creature {
 			cooldown: 0,
 			max_cooldown: 0,
 			sprite,
-			damage: 10,
-			range: 32,
-			bullet_sprite: Sprite("bullet".to_string()),
+			ammo: Ammo {
+				damage: 10,
+				range: 32,
+				speed: 2,
+				sprite: Sprite("bullet".to_string()),
+				aim: 10,
+				spread: 1
+			},
 			alignment: Alignment::Player(playerid)
 		}
 	}
@@ -83,11 +95,31 @@ impl Creature {
 			cooldown: rand::random::<i64>() % 3,
 			max_cooldown: 2,
 			sprite: Sprite("zombie".to_string()),
-			damage: 10,
-			range: 1,
-			bullet_sprite: Sprite("bullet".to_string()),
+			ammo: Ammo {
+				damage: 10,
+				range: 1,
+				speed: 2,
+				sprite: Sprite("bite".to_string()),
+				aim: 10,
+				spread: 10
+			},
 			alignment: Alignment::Monsters
 		}
+	}
+}
+
+
+#[derive(Debug, Clone)]
+pub struct Bullet{
+	direction: Direction,
+	pos: Pos,
+	alignment: Alignment,
+	ammo: Ammo
+}
+
+impl Bullet {
+	fn sprite(&self) -> Sprite{
+		self.ammo.sprite.clone()
 	}
 }
 
@@ -133,19 +165,6 @@ impl Tile {
 	}
 }
 
-#[derive(Debug, Clone)]
-pub struct Bullet{
-	direction: Direction,
-	pos: Pos,
-	range: i64,
-	damage: i64
-}
-
-impl Bullet {
-	fn sprite(&self) -> Sprite{
-		Sprite("bullet".to_string())
-	}
-}
 
 pub struct World {
 	pub time: Timestamp,
@@ -310,8 +329,8 @@ impl World {
 						self.bullets.push(Bullet{
 							direction: creature.dir,
 							pos: creature.pos,
-							range: creature.range,
-							damage: creature.damage
+							alignment: creature.alignment.clone(),
+							ammo: creature.ammo.clone()
 						});
 					}
 				}
@@ -329,19 +348,35 @@ impl World {
 			.map(|(creatureid, creature)| (creature.pos, *creatureid))
 			.collect();
 		self.bullets = self.bullets.clone().into_iter().filter_map(|mut bullet| {
-			for _i in 0..2 {
-				if bullet.range == 0 {
-					return None;
+			for i in 0..(bullet.ammo.speed + 1) {
+				if i != 0 {
+					if bullet.ammo.range == 0 {
+						return None;
+					}
+					if bullet.ammo.spread == 0 {
+						let d = bullet.direction.to_position();
+						let ds = Pos::new(d.y, d.x);
+						let r: u8 = thread_rng().gen_range(0..3);
+						if r == 1 {
+							bullet.pos = bullet.pos + ds;
+						} else if r == 2 {
+							bullet.pos = bullet.pos - ds;
+						}
+						bullet.ammo.spread = bullet.ammo.aim
+					}
+					bullet.ammo.range -= 1;
+					bullet.ammo.spread -=1;
+					bullet.pos = bullet.pos + bullet.direction;
 				}
-				bullet.range -= 1;
-				bullet.pos = bullet.pos + bullet.direction;
 				if let Some(creatureid) = creatures.get(&bullet.pos){
 					if let Some(creature) = self.creatures.get_mut(creatureid){
-						creature.health -= bullet.damage;
-						if creature.health <= 0 {
-							self.creatures.remove(creatureid);
+						if creature.alignment != bullet.alignment {
+							creature.health -= bullet.ammo.damage;
+							if creature.health <= 0 {
+								self.creatures.remove(creatureid);
+							}
+							return None;
 						}
-						return None;
 					}
 				}
 				if let Some(tile) = self.ground.get(&bullet.pos) {
