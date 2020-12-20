@@ -117,12 +117,6 @@ pub struct Bullet{
 	ammo: Ammo
 }
 
-impl Bullet {
-	fn sprite(&self) -> Sprite{
-		self.ammo.sprite.clone()
-	}
-}
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FloorType{
@@ -173,6 +167,7 @@ pub struct World {
 	players: HashMap<PlayerId, Player>,
 	creatures: Holder<Creature>,
 	bullets: Vec<Bullet>,
+	particles: HashMap<Pos, Sprite>,
 	spawnpoint: Pos,
 	monsterspawn: Vec<Pos>,
 }
@@ -219,6 +214,7 @@ impl World {
 			creatures: Holder::new(),
 			bullets: Vec::new(),
 			time: Timestamp(0),
+			particles: HashMap::new(),
 			monsterspawn: vec![Pos::new(0,0), Pos::new(size.0-1, 0), Pos::new(0, size.1-1), Pos::new(size.0-1, size.1-1)]
 		}
 	}
@@ -356,7 +352,7 @@ impl World {
 					if bullet.ammo.spread == 0 {
 						let d = bullet.direction.to_position();
 						let ds = Pos::new(d.y, d.x);
-						let r: u8 = thread_rng().gen_range(0..3);
+						let r: u8 = thread_rng().gen_range(0..4);
 						if r == 1 {
 							bullet.pos = bullet.pos + ds;
 						} else if r == 2 {
@@ -367,6 +363,7 @@ impl World {
 					bullet.ammo.range -= 1;
 					bullet.ammo.spread -=1;
 					bullet.pos = bullet.pos + bullet.direction;
+					self.particles.insert(bullet.pos, bullet.ammo.sprite.clone());
 				}
 				if let Some(creatureid) = creatures.get(&bullet.pos){
 					if let Some(creature) = self.creatures.get_mut(creatureid){
@@ -390,6 +387,7 @@ impl World {
 	}
 	
 	pub fn update(&mut self) {
+		self.particles.clear();
 		self.update_bullets();
 		self.update_creatures();
 		if self.time.0 % 10 == 0 && self.creatures.len() - self.players.len() < 8 {
@@ -415,9 +413,8 @@ impl World {
 		for creature in self.creatures.values() {
 			sprites.entry(creature.pos).or_insert(Vec::new()).insert(0, creature.sprite.clone());
 		}
-		for bullet in self.bullets.iter() {
-			sprites.entry(bullet.pos).or_insert(Vec::new()).insert(0, bullet.sprite());
-			sprites.entry(bullet.pos + bullet.direction).or_insert(Vec::new()).insert(0, bullet.sprite());
+		for (pos, sprite) in self.particles.iter() {
+			sprites.entry(*pos).or_insert(Vec::new()).insert(0, sprite.clone());
 		}
 		
 		let (width, height) = self.size;
