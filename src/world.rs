@@ -1,5 +1,7 @@
 
 use std::collections::HashMap;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 
 use crate::{
 	PlayerId,
@@ -251,21 +253,23 @@ impl World {
 						}
 					}
 				}
-				let target_pos = target?;
-				let mut dirs = creature.pos.directions_to(target_pos);
-				if creature.pos.distance_to(target_pos) == 1 {
-					let dir = dirs[0];
-					return Some(Control::Shoot(Some(dir)))
-				} else {
-					if dirs.len() == 0 {
-						dirs = vec![Direction::North, Direction::South, Direction::East, Direction::West];
+				let mut dirs = Vec::new();
+				if let Some(target_pos) = target {
+					dirs = creature.pos.directions_to(target_pos);
+					if creature.pos.distance_to(target_pos) == 1 {
+						let dir = dirs[0];
+						return Some(Control::Shoot(Some(dir)))
 					}
-					for dir in dirs{
-						let newpos = creature.pos + dir;
-						if let Some(tile) = self.ground.get(&newpos) {
-							if !tile.blocking() {
-								return Some(Control::Move(dir));
-							}
+				}
+				if dirs.len() == 0 {
+					dirs = vec![Direction::North, Direction::South, Direction::East, Direction::West];
+				}
+				dirs.shuffle(&mut thread_rng());
+				for dir in dirs{
+					let newpos = creature.pos + dir;
+					if let Some(tile) = self.ground.get(&newpos) {
+						if !tile.blocking() {
+							return Some(Control::Move(dir));
 						}
 					}
 				}
