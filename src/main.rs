@@ -17,6 +17,7 @@ mod sprite;
 mod timestamp;
 mod config;
 mod errors;
+mod holder;
 
 use self::{
 	pos::{Pos, Direction},

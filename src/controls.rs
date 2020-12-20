@@ -8,7 +8,8 @@ use crate::{PlayerId, Direction, sprite::Sprite};
 #[serde(rename_all="lowercase")]
 pub enum Control {
 	Move(Direction),
-	Shoot(Option<Direction>)
+	Shoot(Option<Direction>),
+	Suicide
 }
 
 #[derive(Debug, Clone)]
