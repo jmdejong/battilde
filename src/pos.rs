@@ -1,6 +1,6 @@
 
 
-use std::ops::{Add, Sub};
+use std::ops::{Add, Sub, Neg};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use crate::util::clamp;
 
@@ -103,7 +103,6 @@ impl<'de> Deserialize<'de> for Pos {
 
 impl Add<Pos> for Pos {
 	type Output = Pos;
-
 	fn add(self, other: Pos) -> Pos {
 		Pos {
 			x: self.x + other.x,
@@ -114,7 +113,6 @@ impl Add<Pos> for Pos {
 
 impl Add<Direction> for Pos {
 	type Output = Pos;
-
 	fn add(self, dir: Direction) -> Pos {
 		let other = dir.to_position();
 		Pos {
@@ -126,13 +124,19 @@ impl Add<Direction> for Pos {
 
 impl Sub<Pos> for Pos {
 	type Output = Pos;
-
 	fn sub(self, other: Pos) -> Pos {
 		Pos {
 			x: self.x - other.x,
 			y: self.y - other.y
 		}
 	}
+}
+
+impl Neg for Pos {
+    type Output = Pos;
+    fn neg(self) -> Pos {
+		Pos {x: -self.x, y: -self.y}
+    }
 }
 
 

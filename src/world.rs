@@ -13,8 +13,8 @@ use crate::{
 	sprite::Sprite,
 	worldmessages::{WorldMessage, FieldMessage},
 	Timestamp,
-	util::randomize,
-	creature::{Creature, Mind},
+	util::{randomize},
+	creature::{Creature, Mind, MonsterType, Alignment},
 	tile::Tile,
 	bullet::Bullet,
 	tile::FloorType,
@@ -34,19 +34,17 @@ pub struct World {
 	particles: HashMap<Pos, Sprite>,
 	spawnpoint: Pos,
 	monsterspawn: Vec<Pos>,
-	items: HashMap<Pos, Item>
+	items: HashMap<Pos, Item>,
+	wave: usize,
+	to_spawn: Vec<MonsterType>
 }
 
 impl World {
-	
-	pub fn new() -> Self {
-		
-		let size = (64, 64);
-		let spawnpoint = Pos::new(size.0 / 2, size.1 / 2);
-		let mut ground = HashMap::new();
-		for x in 0..size.0 {
-			for y in 0..size.1 {
-				let dspawn = (Pos::new(x, y) - spawnpoint).abs();
+
+	fn generate_map(&mut self) {
+		for x in 0..self.size.0 {
+			for y in 0..self.size.1 {
+				let dspawn = (Pos::new(x, y) - self.spawnpoint).abs();
 				let floor = if dspawn.x <= 3 && dspawn.y <= 3 {
 					Tile::Sanctuary
 				} else if dspawn.x <= 4 && dspawn.y <= 4 && dspawn.x != dspawn.y{
@@ -56,33 +54,38 @@ impl World {
 				} else {
 					Tile::Floor([FloorType::Grass1, FloorType::Grass2, FloorType::Grass3][randomize(x as u32 + randomize(y as u32)) as usize % 3])
 				};
-				ground.insert(Pos::new(x, y), floor);
+				self.ground.insert(Pos::new(x, y), floor);
 			}
 		}
-		let p: Vec<(i64, i64)> = vec![(4, 4), (3, 3), (4, 3), (4, 2)];
+		let p: Vec<(i64, i64)> = vec![(4, 4), (3, 3), (4, 3), (4, 2), (3, 4), (2, 4)];
 		for (x, y) in p {
-			ground.insert(spawnpoint + Pos::new(x, y), Tile::Wall);
-			ground.insert(spawnpoint + Pos::new(-x, -y), Tile::Wall);
-			ground.insert(spawnpoint + Pos::new(x, -y), Tile::Wall);
-			ground.insert(spawnpoint + Pos::new(-x, y), Tile::Wall);
-			ground.insert(spawnpoint + Pos::new(y, x), Tile::Wall);
-			ground.insert(spawnpoint + Pos::new(-y, -x), Tile::Wall);
-			ground.insert(spawnpoint + Pos::new(y, -x), Tile::Wall);
-			ground.insert(spawnpoint + Pos::new(-y, x), Tile::Wall);
+			self.ground.insert(self.spawnpoint + Pos::new(x, y), Tile::Wall);
+			self.ground.insert(self.spawnpoint + Pos::new(-x, -y), Tile::Wall);
+			self.ground.insert(self.spawnpoint + Pos::new(x, -y), Tile::Wall);
+			self.ground.insert(self.spawnpoint + Pos::new(-x, y), Tile::Wall);
 		}
+	}
+	
+	pub fn new() -> Self {
 		
-		World {
+		let size = (64, 64);
+		
+		let mut world = World {
 			size,
-			spawnpoint,
-			ground,
+			spawnpoint: Pos::new(size.0 / 2, size.1 / 2),
+			ground: HashMap::new(),
 			players: HashMap::new(),
 			creatures: Holder::new(),
 			bullets: Vec::new(),
 			time: Timestamp(0),
 			particles: HashMap::new(),
 			monsterspawn: vec![Pos::new(0,0), Pos::new(size.0-1, 0), Pos::new(0, size.1-1), Pos::new(size.0-1, size.1-1)],
-			items: HashMap::new()
-		}
+			items: HashMap::new(),
+			wave: 0,
+			to_spawn: Vec::new()
+		};
+		world.generate_map();
+		world
 	}
 	
 	pub fn add_player(&mut self, playerid: &PlayerId, sprite: Sprite) -> Result<()> {
@@ -124,7 +127,7 @@ impl World {
 				// find nearest attackable target
 				let mut target = None;
 				for player in self.creatures.values() {
-					if player.alignment != creature.alignment && !(self.ground.get(&player.pos) == Some(&Tile::Sanctuary)){
+					if player.alignment != creature.alignment && !(player.mind == Mind::Building) && self.ground.get(&player.pos) != Some(&Tile::Sanctuary){
 						if let Some(target_pos) = target {
 							if creature.pos.distance_to(player.pos) < creature.pos.distance_to(target_pos) {
 								target = Some(player.pos);
@@ -137,9 +140,8 @@ impl World {
 				let mut dirs = Vec::new();
 				if let Some(target_pos) = target {
 					dirs = creature.pos.directions_to(target_pos);
-					if creature.pos.distance_to(target_pos) == 1 {
-						let dir = dirs[0];
-						return Some(Control::Shoot(Some(dir)))
+					if creature.pos.distance_to(target_pos) <= creature.ammo.range && dirs.len() > 0 {
+						return Some(Control::ShootPrecise(target_pos - creature.pos))
 					}
 				}
 				if dirs.len() == 0 {
@@ -154,8 +156,9 @@ impl World {
 						}
 					}
 				}
-				return None;
+				None
 			}
+			Mind::Building => None
 		}
 	}
 	
@@ -169,7 +172,7 @@ impl World {
 				continue;
 			}
 			if self.ground.get(&creature.pos) == Some(&Tile::Sanctuary) {
-				creature.health += 4;
+				creature.health += 2;
 				if creature.health > creature.max_health {
 					creature.health = creature.max_health;
 				}
@@ -209,10 +212,22 @@ impl World {
 					}
 					if !self.ground.get(&creature.pos).unwrap().blocking(){
 						self.bullets.push(Bullet{
-							direction: creature.dir,
+							direction: creature.dir.to_position(),
 							pos: creature.pos,
 							alignment: creature.alignment.clone(),
-							ammo: creature.ammo.clone()
+							ammo: creature.ammo.clone(),
+							steps: Pos::new(0, 0)
+						});
+					}
+				}
+				Some(Control::ShootPrecise(dirvec)) => {
+					if !self.ground.get(&creature.pos).unwrap().blocking(){
+						self.bullets.push(Bullet{
+							direction: *dirvec,
+							pos: creature.pos,
+							alignment: creature.alignment.clone(),
+							ammo: creature.ammo.clone(),
+							steps: Pos::new(0, 0)
 						});
 					}
 				}
@@ -231,30 +246,17 @@ impl World {
 			.collect();
 		self.bullets = self.bullets.clone().into_iter().filter_map(|mut bullet| {
 			for i in 0..(bullet.ammo.speed + 1) {
+				/* bullet movement */
 				if i != 0 {
 					if bullet.ammo.range == 0 {
 						return None;
 					}
-					if bullet.ammo.aim == 0 {
-						let d = bullet.direction.to_position();
-						let ds = Pos::new(d.y, d.x);
-						let r: u8 = thread_rng().gen_range(0..4);
-						if r == 1 {
-							bullet.pos = bullet.pos + ds;
-						} else if r == 2 {
-							bullet.pos = bullet.pos - ds;
-						}
-						bullet.ammo.aim = bullet.ammo.accuracy
-					}
 					bullet.ammo.range -= 1;
-					bullet.ammo.aim -=1;
-					bullet.pos = bullet.pos + bullet.direction;
-					let sprites = &bullet.ammo.sprites;
-					let sprite = if sprites.len() > 1 && (bullet.direction == Direction::East || bullet.direction == Direction::West) {
-							sprites[1].clone()
-						} else {sprites[0].clone()};
-					self.particles.insert(bullet.pos, sprite);
+					bullet.movement();
+					/* draw the trail */
+					self.particles.insert(bullet.pos, bullet.sprite());
 				}
+				/* hit creature */
 				if let Some(creatureid) = creature_map.get(&bullet.pos){
 					if let Some(creature) = self.creatures.get_mut(creatureid){
 						if creature.alignment != bullet.alignment {
@@ -263,6 +265,7 @@ impl World {
 						}
 					}
 				}
+				/* hit static geometry */
 				if let Some(tile) = self.ground.get(&bullet.pos) {
 					if tile.blocking(){
 						return None;
@@ -285,9 +288,20 @@ impl World {
 		}
 		
 		// spawn monsters
-		let nmonsters = self.creatures.len() - self.players.len();
-		if self.time.0 % 10 == 0 && nmonsters < 5 + 5*self.players.len() {
-			self.creatures.insert(Creature::new_zombie(
+		let nmonsters = self.creatures.values().filter(|c| c.alignment == Alignment::Monsters).count();
+		let nplayers = std::cmp::max(self.players.len(), 1);
+		if nmonsters == 0 && self.to_spawn.is_empty() {
+			self.wave += 1;
+			for _i in 0..10 + 5 * nplayers{
+				self.to_spawn.push(MonsterType::Zombie);
+			}
+			for _i in 0..((1 + nplayers)/2) {
+				self.to_spawn.push(MonsterType::Ymp);
+			}
+		}
+		if self.time.0 % 5 == 0 && !self.to_spawn.is_empty() {
+			self.creatures.insert(Creature::create_monster(
+				self.to_spawn.remove(0),
 				self.monsterspawn[thread_rng().gen_range(0..self.monsterspawn.len())],
 			));
 		}

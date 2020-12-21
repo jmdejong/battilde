@@ -59,6 +59,7 @@ impl<T> Holder<T> {
 		self.storage.values()
 	}
 	
+	#[allow(dead_code)]
 	#[inline]
 	pub fn len(&self) -> usize {
 		self.storage.len()

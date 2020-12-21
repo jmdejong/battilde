@@ -1,7 +1,7 @@
 
 
 use serde::{Serialize, Deserialize};
-use crate::{PlayerId, Direction, sprite::Sprite};
+use crate::{PlayerId, Direction, Pos, sprite::Sprite};
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -9,6 +9,7 @@ use crate::{PlayerId, Direction, sprite::Sprite};
 pub enum Control {
 	Move(Direction),
 	Shoot(Option<Direction>),
+	ShootPrecise(Pos),
 	Suicide
 }
 

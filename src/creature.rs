@@ -6,7 +6,15 @@ use crate::{sprite::Sprite, Pos, Direction, bullet::Ammo, PlayerId};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Mind {
 	Player(PlayerId),
-	Zombie
+	Zombie,
+	Building
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, )]
+pub enum MonsterType {
+	Zombie,
+	Ymp,
+	
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,7 +36,7 @@ pub struct Creature {
 	pub max_health: i64,
 	pub sprite: Sprite,
 	pub alignment: Alignment,
-	pub ammo: Ammo
+	pub ammo: Ammo,
 }
 
 impl Creature {
@@ -45,12 +53,12 @@ impl Creature {
 			ammo: Ammo {
 				damage: 10,
 				range: 32,
-				speed: 2,
+				speed: 3,
 				sprites: vec![Sprite("bulletvert".to_string()), Sprite("bullethor".to_string())],
 				aim: 1,
 				accuracy: 12
 			},
-			alignment: Alignment::Player(playerid)
+			alignment: Alignment::Player(playerid),
 		}
 	}
 	
@@ -73,6 +81,35 @@ impl Creature {
 				accuracy: 10
 			},
 			alignment: Alignment::Monsters
+		}
+	}
+	
+	pub fn new_ymp(pos: Pos) -> Self {
+		Self {
+			mind: Mind::Zombie,
+			pos,
+			dir: Direction::North,
+			health: 20,
+			max_health: 20,
+			cooldown: rand::random::<i64>() % 3,
+			max_cooldown: 2,
+			sprite: Sprite("ymp".to_string()),
+			ammo: Ammo {
+				damage: 10,
+				range: 24,
+				speed: 1,
+				sprites: vec![Sprite("bullet".to_string())],
+				aim: 120,
+				accuracy: 20
+			},
+			alignment: Alignment::Monsters
+		}
+	}
+	
+	pub fn create_monster(typ: MonsterType, pos: Pos) -> Self{
+		match typ {
+			MonsterType::Zombie => Self::new_zombie(pos),
+			MonsterType::Ymp => Self::new_ymp(pos),
 		}
 	}
 }
