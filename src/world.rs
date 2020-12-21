@@ -15,11 +15,11 @@ use crate::{
 	Timestamp,
 	util::{randomize},
 	creature::{Creature, Mind, MonsterType, Alignment},
-	tile::Tile,
+	tile::{Tile, FloorType, WallType},
 	bullet::Bullet,
-	tile::FloorType,
 	item::Item,
-	player::Player
+	player::Player,
+	waves::wave_composition,
 };
 
 
@@ -36,7 +36,9 @@ pub struct World {
 	monsterspawn: Vec<Pos>,
 	items: HashMap<Pos, Item>,
 	wave: usize,
-	to_spawn: Vec<MonsterType>
+	to_spawn: Vec<MonsterType>,
+	pause: i64,
+	gameover: i64,
 }
 
 impl World {
@@ -57,13 +59,15 @@ impl World {
 				self.ground.insert(Pos::new(x, y), floor);
 			}
 		}
-		let p: Vec<(i64, i64)> = vec![(4, 4), (3, 3), (4, 3), (4, 2), (3, 4), (2, 4)];
-		for (x, y) in p {
-			self.ground.insert(self.spawnpoint + Pos::new(x, y), Tile::Wall);
-			self.ground.insert(self.spawnpoint + Pos::new(-x, -y), Tile::Wall);
-			self.ground.insert(self.spawnpoint + Pos::new(x, -y), Tile::Wall);
-			self.ground.insert(self.spawnpoint + Pos::new(-x, y), Tile::Wall);
-		}
+		let d: Vec<(i64, i64)> = vec![(1, 1), (1, -1), (-1, 1), (-1, -1)];
+		let p: Vec<(i64, i64)> = vec![(3, 3), (4, 3), (4, 2), (3, 4), (2, 4)];
+		for (dx, dy) in d {
+			for (px, py) in p.iter() {
+				self.ground.insert(self.spawnpoint + Pos::new(px * dx, py * dy), Tile::Wall(WallType::Wall));
+			}
+			self.ground.insert(self.spawnpoint + Pos::new(4 * dx, 4 * dy), Tile::Wall(WallType::Rubble));
+			self.creatures.insert(Creature::new_pillar(self.spawnpoint + Pos::new(4*dx, 4*dy)));
+		} 
 	}
 	
 	pub fn new() -> Self {
@@ -82,10 +86,24 @@ impl World {
 			monsterspawn: vec![Pos::new(0,0), Pos::new(size.0-1, 0), Pos::new(0, size.1-1), Pos::new(size.0-1, size.1-1)],
 			items: HashMap::new(),
 			wave: 0,
-			to_spawn: Vec::new()
+			to_spawn: Vec::new(),
+			pause: 0,
+			gameover: 0
 		};
 		world.generate_map();
 		world
+	}
+	
+	pub fn reset(&mut self) {
+		self.creatures.clear();
+		self.bullets.clear();
+		self.particles.clear();
+		self.items.clear();
+		self.wave = 0;
+		self.to_spawn.clear();
+		self.pause = 0;
+		self.gameover = 0;
+		self.generate_map();
 	}
 	
 	pub fn add_player(&mut self, playerid: &PlayerId, sprite: Sprite) -> Result<()> {
@@ -127,7 +145,7 @@ impl World {
 				// find nearest attackable target
 				let mut target = None;
 				for player in self.creatures.values() {
-					if player.alignment != creature.alignment && !(player.mind == Mind::Building) && self.ground.get(&player.pos) != Some(&Tile::Sanctuary){
+					if player.alignment != creature.alignment && player.mind != Mind::Pillar && self.ground.get(&player.pos) != Some(&Tile::Sanctuary){
 						if let Some(target_pos) = target {
 							if creature.pos.distance_to(player.pos) < creature.pos.distance_to(target_pos) {
 								target = Some(player.pos);
@@ -144,10 +162,10 @@ impl World {
 						return Some(Control::ShootPrecise(target_pos - creature.pos))
 					}
 				}
-				if dirs.len() == 0 {
-					dirs = vec![Direction::North, Direction::South, Direction::East, Direction::West];
-				}
+				let mut default_dirs = vec![Direction::North, Direction::South, Direction::East, Direction::West];
 				dirs.shuffle(&mut thread_rng());
+				default_dirs.shuffle(&mut thread_rng());
+				dirs.append(&mut default_dirs);
 				for dir in dirs{
 					let newpos = creature.pos + dir;
 					if let Some(tile) = self.ground.get(&newpos) {
@@ -158,7 +176,42 @@ impl World {
 				}
 				None
 			}
-			Mind::Building => None
+			Mind::Destroyer => {
+				// find nearest attackable target
+				let mut target = None;
+				for player in self.creatures.values() {
+					if player.alignment != creature.alignment && player.mind == Mind::Pillar{
+						if let Some(target_pos) = target {
+							if creature.pos.distance_to(player.pos) < creature.pos.distance_to(target_pos) {
+								target = Some(player.pos);
+							}
+						} else {
+							target = Some(player.pos);
+						}
+					}
+				}
+				let mut dirs = Vec::new();
+				if let Some(target_pos) = target {
+					dirs = creature.pos.directions_to(target_pos);
+					if creature.pos.distance_to(target_pos) <= creature.ammo.range && dirs.len() > 0 {
+						return Some(Control::ShootPrecise(target_pos - creature.pos))
+					}
+				}
+				let mut default_dirs = vec![Direction::North, Direction::South, Direction::East, Direction::West];
+				dirs.shuffle(&mut thread_rng());
+				default_dirs.shuffle(&mut thread_rng());
+				dirs.append(&mut default_dirs);
+				for dir in dirs{
+					let newpos = creature.pos + dir;
+					if let Some(tile) = self.ground.get(&newpos) {
+						if !tile.blocking() {
+							return Some(Control::Move(dir));
+						}
+					}
+				}
+				None
+			}
+			Mind::Pillar => None
 		}
 	}
 	
@@ -171,7 +224,7 @@ impl World {
 			if creature.health <= 0 {
 				continue;
 			}
-			if self.ground.get(&creature.pos) == Some(&Tile::Sanctuary) {
+			if self.ground.get(&creature.pos) == Some(&Tile::Sanctuary) || self.pause > 0{
 				creature.health += 2;
 				if creature.health > creature.max_health {
 					creature.health = creature.max_health;
@@ -188,20 +241,24 @@ impl World {
 					let newpos = creature.pos + *direction;
 					if let Some(tile) = self.ground.get(&newpos) {
 						if (
-									!tile.blocking() ||
-									tile == &Tile::Gate && self.ground.get(&creature.pos) == Some(&Tile::Sanctuary) && creature.health >= creature.max_health) &&
-								!creature_map.contains_key(&newpos) {
+								!tile.blocking()
+									|| tile == &Tile::Gate
+										&& self.ground.get(&creature.pos) == Some(&Tile::Sanctuary)
+										&& creature.health >= creature.max_health)
+								&& !creature_map.contains_key(&newpos) {
 							if creature_map.get(&creature.pos) == Some(id){
 								creature_map.remove(&creature.pos);
 							}
 							creature_map.insert(newpos, *id);
 							creature.pos = newpos;
-							match self.items.get(&creature.pos) {
-								Some(Item::Health) => {
-									creature.health = creature.max_health;
-									self.items.remove(&creature.pos);
+							if let Mind::Player(_) = creature.mind {
+								match self.items.get(&creature.pos) {
+									Some(Item::Health) => {
+										creature.health = creature.max_health;
+										self.items.remove(&creature.pos);
+									}
+									None => {}
 								}
-								None => {}
 							}
 						}
 					}
@@ -292,14 +349,12 @@ impl World {
 		let nplayers = std::cmp::max(self.players.len(), 1);
 		if nmonsters == 0 && self.to_spawn.is_empty() {
 			self.wave += 1;
-			for _i in 0..10 + 5 * nplayers{
-				self.to_spawn.push(MonsterType::Zombie);
-			}
-			for _i in 0..((1 + nplayers)/2) {
-				self.to_spawn.push(MonsterType::Ymp);
-			}
+			self.pause = 25;
+			self.to_spawn = wave_composition(self.wave, nplayers);
 		}
-		if self.time.0 % 5 == 0 && !self.to_spawn.is_empty() {
+		if self.pause > 0 {
+			self.pause -= 1;
+		} else if self.time.0 % 5 == 0 && !self.to_spawn.is_empty() {
 			self.creatures.insert(Creature::create_monster(
 				self.to_spawn.remove(0),
 				self.monsterspawn[thread_rng().gen_range(0..self.monsterspawn.len())],
@@ -308,19 +363,42 @@ impl World {
 		
 		// spawn items
 		for pos in dead_positions {
-			if self.items.len() < 2  && thread_rng().gen_range(0..10) == 0{
+			if self.items.len() < nplayers + 1  && thread_rng().gen_range(0..10) == 0{
 				self.items.insert(pos, Item::Health);
 			}
 		}
 	}
 	
 	pub fn update(&mut self) {
+		if self.gameover > 0 {
+			let mut rng = thread_rng();
+			let gopos = Pos::new(rng.gen_range(0..(self.size.0 - 10)), rng.gen_range(0..self.size.1));
+			for (i, c) in "GAME_OVER!".chars().enumerate() {
+				let mut spritename = "emptyletter-".to_string();
+				spritename.push(c);
+				self.particles.insert(Pos::new(gopos.x + (i as i64), gopos.y), Sprite(spritename));
+			}
+			self.gameover -= 1;
+			if self.gameover == 0 {
+				self.reset();
+			}
+			return
+		}
 		self.particles.clear();
 		self.update_creatures();
 		self.update_bullets();
 		let mut dead_positions = Vec::new();
-		self.creatures.retain(|_id, creature| if creature.health <= 0 {dead_positions.push(creature.pos); false} else {true});
+		self.creatures.retain(|_id, creature| if creature.health <= 0 {
+			if creature.alignment == Alignment::Monsters {
+				dead_positions.push(creature.pos);
+			}
+			false
+		} else {true});
 		self.spawn(dead_positions);
+		
+		if self.creatures.values().filter(|c| c.mind == Mind::Pillar && c.alignment == Alignment::Players).count() == 0 {
+			self.gameover = 50;
+		}
 		self.time.0 += 1;
 	}
 	

@@ -2,25 +2,28 @@
 
 
 use crate::{sprite::Sprite, Pos, Direction, bullet::Ammo, PlayerId};
+use rand::{Rng, thread_rng};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Mind {
 	Player(PlayerId),
 	Zombie,
-	Building
+	Destroyer,
+	Pillar
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, )]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, )]
 pub enum MonsterType {
 	Zombie,
 	Ymp,
-	
+	Troll
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Alignment {
 	#[allow(dead_code)]
 	Players,
+	#[allow(dead_code)]
 	Player(PlayerId),
 	Monsters
 }
@@ -58,7 +61,29 @@ impl Creature {
 				aim: 1,
 				accuracy: 12
 			},
-			alignment: Alignment::Player(playerid),
+			alignment: Alignment::Players,
+		}
+	}
+	
+	pub fn new_pillar(pos: Pos) -> Self {
+		Self {
+			mind: Mind::Pillar,
+			pos,
+			dir: Direction::North,
+			health: 200,
+			max_health: 200,
+			cooldown: rand::random::<i64>() % 3,
+			max_cooldown: 2,
+			sprite: Sprite("pillar".to_string()),
+			ammo: Ammo {
+				damage: 10,
+				range: 1,
+				speed: 2,
+				sprites: vec![Sprite("bite".to_string())],
+				aim: 10,
+				accuracy: 10
+			},
+			alignment: Alignment::Players
 		}
 	}
 	
@@ -106,10 +131,34 @@ impl Creature {
 		}
 	}
 	
+	pub fn new_troll(pos: Pos) -> Self {
+		Self {
+			mind: Mind::Destroyer,
+			pos,
+			dir: Direction::North,
+			health: 100,
+			max_health: 100,
+			cooldown: thread_rng().gen_range(0..3),
+			max_cooldown: 4,
+			sprite: Sprite("troll".to_string()),
+			ammo: Ammo {
+				damage: 50,
+				range: 2,
+				speed: 1,
+				sprites: vec![Sprite("bullet".to_string())],
+				aim: 120,
+				accuracy: 20
+			},
+			alignment: Alignment::Monsters
+		}
+	}
+	
+	
 	pub fn create_monster(typ: MonsterType, pos: Pos) -> Self{
 		match typ {
 			MonsterType::Zombie => Self::new_zombie(pos),
 			MonsterType::Ymp => Self::new_ymp(pos),
+			MonsterType::Troll => Self::new_troll(pos),
 		}
 	}
 }

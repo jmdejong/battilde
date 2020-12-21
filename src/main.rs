@@ -22,6 +22,7 @@ mod bullet;
 mod creature;
 mod tile;
 mod item;
+mod waves;
 
 use self::{
 	pos::{Pos, Direction},

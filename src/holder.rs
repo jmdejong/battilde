@@ -77,4 +77,9 @@ impl<T> Holder<T> {
 	{
 		self.storage.retain(f)
 	}
+	
+	#[inline]
+	pub fn clear(&mut self) {
+		self.storage.clear()
+	}
 }

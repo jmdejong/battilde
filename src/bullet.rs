@@ -49,13 +49,18 @@ impl Bullet {
 		self.ammo.aim -=1;
 		/* regular movement */
 		let dabs = self.direction.abs();
-		self.pos = self.pos + if self.steps.size() == 0 && dabs.y > dabs.x || self.steps.x * dabs.y > dabs.x * self.steps.y {
-				self.steps.y += 1;
-				Pos::new(0, clamp(self.direction.y, -1, 1))
-			} else {
-				self.steps.x += 1;
-				Pos::new(clamp(self.direction.x, -1, 1), 0)
-			};
+		let dpos = if // todo: check if this is correct
+				self.steps.size() == 0 && dabs.y > dabs.x 
+				|| dabs.x == 0
+				|| self.steps.x * dabs.y > dabs.x * self.steps.y
+				|| dabs.x == dabs.y && rand::random() {
+			self.steps.y += 1;
+			Pos::new(0, clamp(self.direction.y, -1, 1))
+		} else {
+			self.steps.x += 1;
+			Pos::new(clamp(self.direction.x, -1, 1), 0)
+		};
+		self.pos = self.pos + dpos;
 	
 	}
 	
