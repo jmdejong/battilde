@@ -17,29 +17,12 @@ use crate::{
 	creature::{Creature, Mind},
 	tile::Tile,
 	bullet::Bullet,
-	tile::FloorType
+	tile::FloorType,
+	item::Item,
+	player::Player
 };
 
 
-#[derive(Debug, Clone)]
-pub struct Player {
-	pub plan: Option<Control>,
-	pub sprite: Sprite,
-	pub body: usize
-}
-
-#[derive(Debug, Clone)]
-pub enum Item {
-	Health
-}
-
-impl Item {
-	pub fn sprite(&self) -> Sprite {
-		Sprite(match self {
-			Self::Health => "health"
-		}.to_string())
-	}
-}
 
 pub struct World {
 	pub time: Timestamp,
@@ -266,7 +249,11 @@ impl World {
 					bullet.ammo.range -= 1;
 					bullet.ammo.aim -=1;
 					bullet.pos = bullet.pos + bullet.direction;
-					self.particles.insert(bullet.pos, bullet.ammo.sprite.clone());
+					let sprites = &bullet.ammo.sprites;
+					let sprite = if sprites.len() > 1 && (bullet.direction == Direction::East || bullet.direction == Direction::West) {
+							sprites[1].clone()
+						} else {sprites[0].clone()};
+					self.particles.insert(bullet.pos, sprite);
 				}
 				if let Some(creatureid) = creature_map.get(&bullet.pos){
 					if let Some(creature) = self.creatures.get_mut(creatureid){
@@ -299,7 +286,7 @@ impl World {
 		
 		// spawn monsters
 		let nmonsters = self.creatures.len() - self.players.len();
-		if self.time.0 % 10 == 0 && nmonsters < 6 + 2*self.players.len() {
+		if self.time.0 % 10 == 0 && nmonsters < 5 + 5*self.players.len() {
 			self.creatures.insert(Creature::new_zombie(
 				self.monsterspawn[thread_rng().gen_range(0..self.monsterspawn.len())],
 			));
@@ -318,7 +305,7 @@ impl World {
 		self.update_creatures();
 		self.update_bullets();
 		let mut dead_positions = Vec::new();
-		self.creatures.retain(|_id, creature| if creature.health < 0 {dead_positions.push(creature.pos); false} else {true});
+		self.creatures.retain(|_id, creature| if creature.health <= 0 {dead_positions.push(creature.pos); false} else {true});
 		self.spawn(dead_positions);
 		self.time.0 += 1;
 	}

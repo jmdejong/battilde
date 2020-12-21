@@ -46,9 +46,9 @@ impl Creature {
 				damage: 10,
 				range: 32,
 				speed: 2,
-				sprite: Sprite("bullet".to_string()),
+				sprites: vec![Sprite("bulletvert".to_string()), Sprite("bullethor".to_string())],
 				aim: 1,
-				accuracy: 8
+				accuracy: 12
 			},
 			alignment: Alignment::Player(playerid)
 		}
@@ -68,7 +68,7 @@ impl Creature {
 				damage: 10,
 				range: 1,
 				speed: 2,
-				sprite: Sprite("bite".to_string()),
+				sprites: vec![Sprite("bite".to_string())],
 				aim: 10,
 				accuracy: 10
 			},

@@ -5,7 +5,7 @@ use crate::{sprite::Sprite, Pos, Direction, creature::Alignment};
 pub struct Ammo {
 	pub damage: i64,
 	pub range: i64,
-	pub sprite: Sprite,
+	pub sprites: Vec<Sprite>,
 	pub speed: i64,
 	pub aim: i64,
 	pub accuracy: i64

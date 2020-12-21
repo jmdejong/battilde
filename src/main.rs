@@ -11,7 +11,7 @@ mod util;
 mod controls;
 mod worldmessages;
 mod pos;
-mod playerid;
+mod player;
 mod world;
 mod sprite;
 mod timestamp;
@@ -21,10 +21,11 @@ mod holder;
 mod bullet;
 mod creature;
 mod tile;
+mod item;
 
 use self::{
 	pos::{Pos, Direction},
-	playerid::PlayerId,
+	player::PlayerId,
 	errors::{Result},
 	sprite::Sprite,
 	timestamp::Timestamp,
