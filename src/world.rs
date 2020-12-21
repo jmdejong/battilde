@@ -28,6 +28,18 @@ pub struct Player {
 	pub body: usize
 }
 
+#[derive(Debug, Clone)]
+pub enum Item {
+	Health
+}
+
+impl Item {
+	pub fn sprite(&self) -> Sprite {
+		Sprite(match self {
+			Self::Health => "health"
+		}.to_string())
+	}
+}
 
 pub struct World {
 	pub time: Timestamp,
@@ -39,6 +51,7 @@ pub struct World {
 	particles: HashMap<Pos, Sprite>,
 	spawnpoint: Pos,
 	monsterspawn: Vec<Pos>,
+	items: HashMap<Pos, Item>
 }
 
 impl World {
@@ -51,11 +64,11 @@ impl World {
 		for x in 0..size.0 {
 			for y in 0..size.1 {
 				let dspawn = (Pos::new(x, y) - spawnpoint).abs();
-				let floor = if dspawn.x <= 4 && dspawn.y <= 4 {
+				let floor = if dspawn.x <= 3 && dspawn.y <= 3 {
 					Tile::Sanctuary
-				} else if dspawn.x <= 5 && dspawn.y <= 5 {
+				} else if dspawn.x <= 4 && dspawn.y <= 4 && dspawn.x != dspawn.y{
 					Tile::Gate
-				} else if dspawn.x <= 2 || dspawn.y <= 2 {
+				} else if dspawn.x <= 1 || dspawn.y <= 1 {
 					Tile::Floor(FloorType::Dirt)
 				} else {
 					Tile::Floor([FloorType::Grass1, FloorType::Grass2, FloorType::Grass3][randomize(x as u32 + randomize(y as u32)) as usize % 3])
@@ -63,7 +76,7 @@ impl World {
 				ground.insert(Pos::new(x, y), floor);
 			}
 		}
-		let p: Vec<(i64, i64)> = vec![(5, 5), (5, 4), (5, 3), (5, 2), (4, 4)];
+		let p: Vec<(i64, i64)> = vec![(4, 4), (3, 3), (4, 3), (4, 2)];
 		for (x, y) in p {
 			ground.insert(spawnpoint + Pos::new(x, y), Tile::Wall);
 			ground.insert(spawnpoint + Pos::new(-x, -y), Tile::Wall);
@@ -84,7 +97,8 @@ impl World {
 			bullets: Vec::new(),
 			time: Timestamp(0),
 			particles: HashMap::new(),
-			monsterspawn: vec![Pos::new(0,0), Pos::new(size.0-1, 0), Pos::new(0, size.1-1), Pos::new(size.0-1, size.1-1)]
+			monsterspawn: vec![Pos::new(0,0), Pos::new(size.0-1, 0), Pos::new(0, size.1-1), Pos::new(size.0-1, size.1-1)],
+			items: HashMap::new()
 		}
 	}
 	
@@ -97,7 +111,7 @@ impl World {
 			Player{
 				plan: None,
 				sprite: sprite.clone(),
-				body: self.creatures.insert(Creature::new_player(playerid.clone(), sprite, self.spawnpoint))
+				body: 0
 			}
 		);
 		Ok(())
@@ -168,6 +182,9 @@ impl World {
 			.collect();
 		let plans: HashMap<usize, Control> = self.creatures.iter().filter_map(|(k, c)|Some((*k, self.creature_plan(c)?))).collect();
 		for (id, creature) in self.creatures.iter_mut() {
+			if creature.health <= 0 {
+				continue;
+			}
 			if self.ground.get(&creature.pos) == Some(&Tile::Sanctuary) {
 				creature.health += 4;
 				if creature.health > creature.max_health {
@@ -193,6 +210,13 @@ impl World {
 							}
 							creature_map.insert(newpos, *id);
 							creature.pos = newpos;
+							match self.items.get(&creature.pos) {
+								Some(Item::Health) => {
+									creature.health = creature.max_health;
+									self.items.remove(&creature.pos);
+								}
+								None => {}
+							}
 						}
 					}
 				}
@@ -210,7 +234,7 @@ impl World {
 					}
 				}
 				Some(Control::Suicide) => {
-				
+					creature.health = -1;
 				}
 				None => {}
 			}
@@ -228,7 +252,7 @@ impl World {
 					if bullet.ammo.range == 0 {
 						return None;
 					}
-					if bullet.ammo.spread == 0 {
+					if bullet.ammo.aim == 0 {
 						let d = bullet.direction.to_position();
 						let ds = Pos::new(d.y, d.x);
 						let r: u8 = thread_rng().gen_range(0..4);
@@ -237,10 +261,10 @@ impl World {
 						} else if r == 2 {
 							bullet.pos = bullet.pos - ds;
 						}
-						bullet.ammo.spread = bullet.ammo.aim
+						bullet.ammo.aim = bullet.ammo.accuracy
 					}
 					bullet.ammo.range -= 1;
-					bullet.ammo.spread -=1;
+					bullet.ammo.aim -=1;
 					bullet.pos = bullet.pos + bullet.direction;
 					self.particles.insert(bullet.pos, bullet.ammo.sprite.clone());
 				}
@@ -248,9 +272,6 @@ impl World {
 					if let Some(creature) = self.creatures.get_mut(creatureid){
 						if creature.alignment != bullet.alignment {
 							creature.health -= bullet.ammo.damage;
-							if creature.health <= 0 {
-								self.creatures.remove(creatureid);
-							}
 							return None;
 						}
 					}
@@ -265,15 +286,9 @@ impl World {
 		}).collect();
 	}
 	
-	pub fn update(&mut self) {
-		self.particles.clear();
-		self.update_creatures();
-		self.update_bullets();
-		if self.time.0 % 10 == 0 && self.creatures.len() - self.players.len() < 8 {
-			self.creatures.insert(Creature::new_zombie(
-				self.monsterspawn[randomize(self.time.0 as u32) as usize % self.monsterspawn.len()],
-			));
-		}
+	fn spawn(&mut self, dead_positions: Vec<Pos>){
+		
+		// spawn players
 		for (playerid, player) in self.players.iter_mut() {
 			if !self.creatures.contains_key(&player.body) {
 				let body = self.creatures.insert(Creature::new_player(playerid.clone(), player.sprite.clone(), self.spawnpoint));
@@ -281,6 +296,30 @@ impl World {
 			}
 			player.plan = None;
 		}
+		
+		// spawn monsters
+		let nmonsters = self.creatures.len() - self.players.len();
+		if self.time.0 % 10 == 0 && nmonsters < 6 + 2*self.players.len() {
+			self.creatures.insert(Creature::new_zombie(
+				self.monsterspawn[thread_rng().gen_range(0..self.monsterspawn.len())],
+			));
+		}
+		
+		// spawn items
+		for pos in dead_positions {
+			if self.items.len() < 2  && thread_rng().gen_range(0..10) == 0{
+				self.items.insert(pos, Item::Health);
+			}
+		}
+	}
+	
+	pub fn update(&mut self) {
+		self.particles.clear();
+		self.update_creatures();
+		self.update_bullets();
+		let mut dead_positions = Vec::new();
+		self.creatures.retain(|_id, creature| if creature.health < 0 {dead_positions.push(creature.pos); false} else {true});
+		self.spawn(dead_positions);
 		self.time.0 += 1;
 	}
 	
@@ -289,6 +328,9 @@ impl World {
 		let mut sprites: HashMap<Pos, Vec<Sprite>> = self.ground.iter()
 			.map(|(pos, tile)| (*pos, vec![tile.sprite()]))
 			.collect();
+		for (pos, item) in self.items.iter() {
+			sprites.entry(*pos).or_insert(Vec::new()).insert(0, item.sprite());
+		}
 		for creature in self.creatures.values() {
 			sprites.entry(creature.pos).or_insert(Vec::new()).insert(0, creature.sprite.clone());
 		}

@@ -8,7 +8,7 @@ pub struct Ammo {
 	pub sprite: Sprite,
 	pub speed: i64,
 	pub aim: i64,
-	pub spread: i64
+	pub accuracy: i64
 }
 
 

@@ -47,8 +47,8 @@ impl Creature {
 				range: 32,
 				speed: 2,
 				sprite: Sprite("bullet".to_string()),
-				aim: 10,
-				spread: 1
+				aim: 1,
+				accuracy: 8
 			},
 			alignment: Alignment::Player(playerid)
 		}
@@ -70,7 +70,7 @@ impl Creature {
 				speed: 2,
 				sprite: Sprite("bite".to_string()),
 				aim: 10,
-				spread: 10
+				accuracy: 10
 			},
 			alignment: Alignment::Monsters
 		}
