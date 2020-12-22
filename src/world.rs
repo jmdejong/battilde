@@ -82,7 +82,7 @@ impl World {
 		self.set_map(create_map(&self.map));
 	}
 	
-	pub fn set_map(&mut self, template: MapTemplate) {
+	fn set_map(&mut self, template: MapTemplate) {
 		self.size = template.size;
 		self.ground = template.ground;
 		self.spawnpoint = template.spawnpoint;
@@ -452,6 +452,9 @@ impl World {
 			if let Some(body) = self.creatures.get(&player.body){
 				wm.pos = Some(body.pos);
 				wm.health = Some((body.health, body.max_health));
+				if self.pause == 1 {
+					wm.sounds = Some(vec![("wave".to_string(), format!("**** Wave {} *****", self.wave), None)]);
+				}
 				views.insert(playerid.clone(), wm);
 			}
 		}
