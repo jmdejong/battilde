@@ -1,8 +1,14 @@
 
-
-
-use crate::{sprite::Sprite, Pos, Direction, bullet::Ammo, PlayerId};
+use serde::{Serialize, Deserialize};
 use rand::{Rng, thread_rng};
+
+use crate::{
+	sprite::Sprite,
+	Pos,
+	Direction,
+	bullet::Ammo,
+	PlayerId
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Mind {
@@ -12,11 +18,12 @@ pub enum Mind {
 	Pillar
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, )]
-pub enum MonsterType {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CreatureType {
 	Zombie,
 	Ymp,
-	Troll
+	Troll,
+	Pillar
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -154,11 +161,12 @@ impl Creature {
 	}
 	
 	
-	pub fn create_monster(typ: MonsterType, pos: Pos) -> Self{
+	pub fn create_creature(typ: CreatureType, pos: Pos) -> Self{
 		match typ {
-			MonsterType::Zombie => Self::new_zombie(pos),
-			MonsterType::Ymp => Self::new_ymp(pos),
-			MonsterType::Troll => Self::new_troll(pos),
+			CreatureType::Zombie => Self::new_zombie(pos),
+			CreatureType::Ymp => Self::new_ymp(pos),
+			CreatureType::Troll => Self::new_troll(pos),
+			CreatureType::Pillar => Self::new_pillar(pos),
 		}
 	}
 }

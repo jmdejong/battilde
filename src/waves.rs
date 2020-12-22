@@ -1,9 +1,9 @@
 
-use crate::creature::MonsterType;
-use MonsterType::*;
+use crate::creature::CreatureType;
+use CreatureType::*;
 
 
-pub fn wave_composition(wave: usize, nplayers: usize) -> Vec<MonsterType> {
+pub fn wave_composition(wave: usize, nplayers: usize) -> Vec<CreatureType> {
 	let mut monsters = Vec::new();
 	let wavedef = [
 		vec![(Zombie, 5)],

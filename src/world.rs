@@ -13,14 +13,14 @@ use crate::{
 	sprite::Sprite,
 	worldmessages::{WorldMessage, FieldMessage},
 	Timestamp,
-	util::{randomize},
-	creature::{Creature, Mind, MonsterType, Alignment},
-	tile::{Tile, FloorType, WallType},
+	creature::{Creature, Mind, CreatureType, Alignment},
+	tile::Tile,
 	bullet::Bullet,
 	item::Item,
 	player::Player,
 	waves::wave_composition,
-	gamemode::GameMode
+	gamemode::GameMode,
+	mapgen::{MapTemplate, MapType, create_map}
 };
 
 
@@ -37,63 +37,36 @@ pub struct World {
 	monsterspawn: Vec<Pos>,
 	items: HashMap<Pos, Item>,
 	wave: usize,
-	to_spawn: Vec<MonsterType>,
+	to_spawn: Vec<CreatureType>,
 	pause: i64,
 	gameover: i64,
 	gamemode: GameMode,
+	map: MapType,
 }
 
 impl World {
-
-	fn generate_map(&mut self) {
-		for x in 0..self.size.0 {
-			for y in 0..self.size.1 {
-				let dspawn = (Pos::new(x, y) - self.spawnpoint).abs();
-				let floor = if dspawn.x <= 3 && dspawn.y <= 3 {
-					Tile::Sanctuary
-				} else if dspawn.x <= 4 && dspawn.y <= 4 && dspawn.x != dspawn.y{
-					Tile::Gate
-				} else if dspawn.x <= 1 || dspawn.y <= 1 {
-					Tile::Floor(FloorType::Dirt)
-				} else {
-					Tile::Floor([FloorType::Grass1, FloorType::Grass2, FloorType::Grass3][randomize(x as u32 + randomize(y as u32)) as usize % 3])
-				};
-				self.ground.insert(Pos::new(x, y), floor);
-			}
-		}
-		let d: Vec<(i64, i64)> = vec![(1, 1), (1, -1), (-1, 1), (-1, -1)];
-		let p: Vec<(i64, i64)> = vec![(3, 3), (4, 3), (4, 2), (3, 4), (2, 4)];
-		for (dx, dy) in d {
-			for (px, py) in p.iter() {
-				self.ground.insert(self.spawnpoint + Pos::new(px * dx, py * dy), Tile::Wall(WallType::Wall));
-			}
-			self.ground.insert(self.spawnpoint + Pos::new(4 * dx, 4 * dy), Tile::Wall(WallType::Rubble));
-			self.creatures.insert(Creature::new_pillar(self.spawnpoint + Pos::new(4*dx, 4*dy)));
-		} 
-	}
 	
-	pub fn new(gamemode: GameMode) -> Self {
-		
-		let size = (64, 64);
+	pub fn new(gamemode: GameMode, map: MapType) -> Self {
 		
 		let mut world = World {
-			size,
-			spawnpoint: Pos::new(size.0 / 2, size.1 / 2),
+			size: (0, 0),
+			spawnpoint: Pos::new(0, 0),
 			ground: HashMap::new(),
 			players: HashMap::new(),
 			creatures: Holder::new(),
 			bullets: Vec::new(),
 			time: Timestamp(0),
 			particles: HashMap::new(),
-			monsterspawn: vec![Pos::new(0,0), Pos::new(size.0-1, 0), Pos::new(0, size.1-1), Pos::new(size.0-1, size.1-1)],
+			monsterspawn: Vec::new(),
 			items: HashMap::new(),
 			wave: 0,
 			to_spawn: Vec::new(),
 			pause: 0,
 			gameover: 0,
 			gamemode,
+			map,
 		};
-		world.generate_map();
+		world.reset();
 		world
 	}
 	
@@ -106,7 +79,17 @@ impl World {
 		self.to_spawn.clear();
 		self.pause = 0;
 		self.gameover = 0;
-		self.generate_map();
+		self.set_map(create_map(&self.map));
+	}
+	
+	pub fn set_map(&mut self, template: MapTemplate) {
+		self.size = template.size;
+		self.ground = template.ground;
+		self.spawnpoint = template.spawnpoint;
+		self.monsterspawn = template.monsterspawn;
+		for (pos, creature) in template.creatures {
+			self.creatures.insert(Creature::create_creature(creature, pos));
+		}
 	}
 	
 	pub fn add_player(&mut self, playerid: &PlayerId, sprite: Sprite) -> Result<()> {
@@ -363,7 +346,7 @@ impl World {
 		if self.pause > 0 {
 			self.pause -= 1;
 		} else if self.time.0 % 5 == 0 && !self.to_spawn.is_empty() {
-			self.creatures.insert(Creature::create_monster(
+			self.creatures.insert(Creature::create_creature(
 				self.to_spawn.remove(0),
 				self.monsterspawn[thread_rng().gen_range(0..self.monsterspawn.len())],
 			));

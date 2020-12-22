@@ -27,6 +27,7 @@ pub enum Tile {
 	Wall(WallType)
 }
 
+
 impl Tile {
 	pub fn sprite(&self) -> Sprite{
 		Sprite(match self {
@@ -49,5 +50,21 @@ impl Tile {
 			Tile::Wall(_) => true,
 			Tile::Gate => true
 		}
+	}
+	
+	pub fn from_char(c: char) -> Option<Self>{
+		Some(match c {
+			'"' => Tile::Floor(FloorType::Stone),
+			'.' => Tile::Floor(FloorType::Dirt),
+			',' => Tile::Floor(FloorType::Grass1),
+			'\'' => Tile::Floor(FloorType::Grass2),
+			'`' => Tile::Floor(FloorType::Grass3),
+			'=' => Tile::Gate,
+			'+' => Tile::Sanctuary,
+			'#' => Tile::Wall(WallType::Wall),
+			'X' => Tile::Wall(WallType::Rock),
+			'R' => Tile::Wall(WallType::Rubble),
+			_ => {return None}
+		})
 	}
 }

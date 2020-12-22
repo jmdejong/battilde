@@ -41,6 +41,7 @@ To play the game you need [the client too](https://github.com/jmdejong/battilde-
 
 To see all command line arguments, pass the argument `--help`:
 
+	$ ./battilde --help
 	Battilde 0.2.0
 	Multiplayer terminal shooter (server)
 
@@ -56,8 +57,11 @@ To see all command line arguments, pass the argument `--help`:
 											Example: "inet:127.0.0.1:1234" or "abstract:battilde" or "unix:/tmp/battilde"
 											or "inet:[::1]:1234"
 			--admins <admins>                  The name(s) of the server admin(s) [env: USER=troido]
+			--custom-map <custom-map>          File path for a custom map to play
 			--game-mode <game-mode>            The gamemode of the server. Options: coop, pvp [default: coop]
+			--map <map>                        The built-in map to play. Ignored if --custom-map is used. [default: square]
 			--step-duration <step-duration>    The time (in milliseconds) between two steps [default: 100]
+
 
 
 

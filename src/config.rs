@@ -1,8 +1,10 @@
 
 use structopt::StructOpt;
+use std::path::PathBuf;
 use crate::{
 	Address,
-	gamemode::GameMode
+	gamemode::GameMode,
+	mapgen::BuiltinMap
 };
 
 #[derive(Debug, StructOpt)]
@@ -19,5 +21,13 @@ pub struct Config {
 	pub step_duration: u64,
 	
 	#[structopt(long, default_value="coop", help="The gamemode of the server. Options: coop, pvp")]
-	pub game_mode: GameMode
+	pub game_mode: GameMode,
+	
+	#[structopt(long, default_value="square", help="The built-in map to play. Ignored if --custom-map is used.")]
+	pub map: BuiltinMap,
+	
+	#[structopt(long, help="File path for a custom map to play")]
+	pub custom_map: Option<PathBuf>,
+	
+	
 }

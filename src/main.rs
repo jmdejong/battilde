@@ -4,6 +4,7 @@ use std::time::Duration;
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use structopt::StructOpt;
 use chrono::Utc;
+use std::fs;
 
 mod server;
 mod gameserver;
@@ -24,6 +25,7 @@ mod tile;
 mod item;
 mod waves;
 mod gamemode;
+mod mapgen;
 
 use self::{
 	pos::{Pos, Direction},
@@ -37,7 +39,8 @@ use self::{
 	server::address::Address,
 	controls::Action,
 	world::World,
-	worldmessages::MessageCache
+	worldmessages::MessageCache,
+	mapgen::{MapType},
 };
 
 
@@ -68,7 +71,15 @@ fn main(){
 	
 	let mut gameserver = GameServer::new(servers, config.admins);
 	
-	let mut world = World::new(config.game_mode);
+	let map = if let Some(map_path) = config.custom_map {
+		let maptext = fs::read_to_string(&map_path).expect(&format!("can't read map {:?}", map_path));
+		let template = json5::from_str(&maptext).expect(&format!("invalid map text:\n{:?}", maptext));
+		MapType::Custom(template)
+	} else {
+		MapType::Builtin(config.map)
+	};
+	
+	let mut world = World::new(config.game_mode, map);
 	
 	let mut message_cache = MessageCache::default();
 	
