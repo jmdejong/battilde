@@ -25,7 +25,7 @@ use crate::{
 
 
 pub struct World {
-	pub time: Timestamp,
+	time: Timestamp,
 	size: (i64, i64),
 	ground: HashMap<Pos, Tile>,
 	players: HashMap<PlayerId, Player>,
@@ -447,6 +447,7 @@ impl World {
 		}
 	}
 	
+	
 	pub fn view(&self) -> HashMap<PlayerId, WorldMessage> {
 		let fm = self.draw();
 		let mut views: HashMap<PlayerId, WorldMessage> = HashMap::new();
@@ -460,6 +461,10 @@ impl World {
 			}
 		}
 		views
+	}
+	
+	pub fn nplayers(&self) -> usize {
+		self.players.len()
 	}
 }
 

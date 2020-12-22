@@ -85,8 +85,10 @@ fn main(){
 	
 	println!("asciifarm started on {}", Utc::now());
 	
+	let mut empty_timer = 0;
 	
 	while running.load(Ordering::SeqCst) {
+		empty_timer += 1;
 		let actions = gameserver.update();
 		for action in actions {
 			match action {
@@ -108,8 +110,15 @@ fn main(){
 						println!("Error: can not remove player {:?}: {:?}", player, err);
 					}
 					message_cache.remove(&player);
+					empty_timer = 0;
 				}
 			}
+		}
+		if world.nplayers() == 0 && empty_timer > 100 {
+			if empty_timer == 3000 {
+				world.reset();
+			}
+			continue;
 		}
 		world.update();
 		let messages = world.view();
