@@ -25,7 +25,10 @@ impl Direction {
 			Direction::West => Pos::new(-1, 0)
 		}
 	}
+	
+	pub const DIRECTIONS: [Direction; 4] = [Direction::North, Direction::South, Direction::East, Direction::West];
 }
+
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Default)]
 pub struct Pos {

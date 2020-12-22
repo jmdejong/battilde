@@ -120,7 +120,66 @@ impl World {
 		Ok(())
 	}
 	
-	fn creature_plan(&self, creature: &Creature) -> Option<Control> {
+	
+	fn distance_map(&self, targets: &[Pos]) -> HashMap<Pos, usize>{
+		let mut frontier: Vec<(Pos, usize)> = targets.iter().map(|pos| (*pos, 0)).collect();
+		let mut known: HashMap<Pos, usize> = HashMap::new();
+		while !frontier.is_empty() {
+			let (pos, cost) = frontier.remove(0);
+// 			println!("{:?}")
+			if known.contains_key(&pos) && *known.get(&pos).unwrap() <= cost {
+				continue;
+			}
+			known.insert(pos, cost);
+			if let Some(tile) = self.ground.get(&pos) {
+				if tile.blocking(){
+					continue;
+				}
+				for dir in &Direction::DIRECTIONS {
+					frontier.push((pos + *dir, cost + 1));
+				}
+			}
+		}
+		known
+	}
+	
+	fn monster_plan<F>(&self, creature: &Creature, distance_map: &HashMap<Pos, usize>, is_target: F) -> Option<Control>
+			where F: Fn(&Creature) -> bool {
+		// find nearest attackable target
+		let mut target = None;
+		for player in self.creatures.values() {
+			if is_target(player) {
+				if let Some(target_pos) = target {
+					if creature.pos.distance_to(player.pos) < creature.pos.distance_to(target_pos) {
+						target = Some(player.pos);
+					}
+				} else {
+					target = Some(player.pos);
+				}
+			}
+		}
+		if let Some(target_pos) = target {
+			if creature.pos.distance_to(target_pos) <= creature.ammo.range {
+				return Some(Control::ShootPrecise(target_pos - creature.pos))
+			}
+		}
+		let mut dirs: Vec<Direction> = Direction::DIRECTIONS.iter().cloned().collect();
+		dirs.shuffle(&mut thread_rng());
+		if let Some(target_pos) = target {
+			dirs.sort_by_key(|dir| (creature.pos + *dir - target_pos).size());
+		}
+		for dir in dirs{
+			let newpos = creature.pos + dir;
+			if let Some(tile) = self.ground.get(&newpos) {
+				if !tile.blocking() {
+					return Some(Control::Move(dir));
+				}
+			}
+		}
+		None
+	}
+	
+	fn creature_plan(&self, creature: &Creature, player_distance: &HashMap<Pos, usize>, building_distance: &HashMap<Pos, usize>) -> Option<Control> {
 		match &creature.mind {
 			Mind::Player(playerid) => {
 				if let Some(player) = self.players.get(&playerid) {
@@ -128,74 +187,23 @@ impl World {
 				} else {Some(Control::Suicide)}
 			}
 			Mind::Zombie => {
-				// find nearest attackable target
-				let mut target = None;
-				for player in self.creatures.values() {
-					if player.alignment != creature.alignment && player.mind != Mind::Pillar && self.ground.get(&player.pos) != Some(&Tile::Sanctuary){
-						if let Some(target_pos) = target {
-							if creature.pos.distance_to(player.pos) < creature.pos.distance_to(target_pos) {
-								target = Some(player.pos);
-							}
-						} else {
-							target = Some(player.pos);
-						}
-					}
-				}
-				let mut dirs = Vec::new();
-				if let Some(target_pos) = target {
-					dirs = creature.pos.directions_to(target_pos);
-					if creature.pos.distance_to(target_pos) <= creature.ammo.range && dirs.len() > 0 {
-						return Some(Control::ShootPrecise(target_pos - creature.pos))
-					}
-				}
-				let mut default_dirs = vec![Direction::North, Direction::South, Direction::East, Direction::West];
-				dirs.shuffle(&mut thread_rng());
-				default_dirs.shuffle(&mut thread_rng());
-				dirs.append(&mut default_dirs);
-				for dir in dirs{
-					let newpos = creature.pos + dir;
-					if let Some(tile) = self.ground.get(&newpos) {
-						if !tile.blocking() {
-							return Some(Control::Move(dir));
-						}
-					}
-				}
-				None
+				self.monster_plan(
+					creature,
+					player_distance,
+					|player| 
+						player.alignment != creature.alignment 
+						&& player.mind != Mind::Pillar 
+						&& self.ground.get(&player.pos) != Some(&Tile::Sanctuary)
+				)
 			}
 			Mind::Destroyer => {
-				// find nearest attackable target
-				let mut target = None;
-				for player in self.creatures.values() {
-					if player.alignment != creature.alignment && player.mind == Mind::Pillar{
-						if let Some(target_pos) = target {
-							if creature.pos.distance_to(player.pos) < creature.pos.distance_to(target_pos) {
-								target = Some(player.pos);
-							}
-						} else {
-							target = Some(player.pos);
-						}
-					}
-				}
-				let mut dirs = Vec::new();
-				if let Some(target_pos) = target {
-					dirs = creature.pos.directions_to(target_pos);
-					if creature.pos.distance_to(target_pos) <= creature.ammo.range && dirs.len() > 0 {
-						return Some(Control::ShootPrecise(target_pos - creature.pos))
-					}
-				}
-				let mut default_dirs = vec![Direction::North, Direction::South, Direction::East, Direction::West];
-				dirs.shuffle(&mut thread_rng());
-				default_dirs.shuffle(&mut thread_rng());
-				dirs.append(&mut default_dirs);
-				for dir in dirs{
-					let newpos = creature.pos + dir;
-					if let Some(tile) = self.ground.get(&newpos) {
-						if !tile.blocking() {
-							return Some(Control::Move(dir));
-						}
-					}
-				}
-				None
+				self.monster_plan(
+					creature,
+					building_distance,
+					|player| 
+						player.alignment != creature.alignment 
+						&& player.mind == Mind::Pillar
+				)
 			}
 			Mind::Pillar => None
 		}
@@ -205,7 +213,21 @@ impl World {
 		let mut creature_map: HashMap<Pos, usize> = self.creatures.iter()
 			.map(|(creatureid, creature)| (creature.pos, *creatureid))
 			.collect();
-		let plans: HashMap<usize, Control> = self.creatures.iter().filter_map(|(k, c)|Some((*k, self.creature_plan(c)?))).collect();
+// 		let mut player_positions = Vec::new();
+// 		let mut building_positions = Vec::new();
+// 		for creature in self.creatures.values().filter(|c| c.alignment != Alignment::Monsters) {
+// 			if creature.mind == Mind::Pillar {
+// 				building_positions.push(creature.pos);
+// 			} else {
+// 				player_positions.push(creature.pos);
+// 			}
+// 		}
+		let player_distance = HashMap::new();//self.distance_map(&player_positions);
+		let building_distance = HashMap::new();//self.distance_map(&building_positions);
+		let plans: HashMap<usize, Control> = self.creatures.iter()
+			.filter_map(|(k, c)|
+				Some((*k, self.creature_plan(c, &player_distance, &building_distance)?))
+			).collect();
 		for (id, creature) in self.creatures.iter_mut() {
 			if creature.health <= 0 {
 				continue;

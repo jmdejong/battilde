@@ -128,6 +128,7 @@ fn main(){
 			if empty_timer == 3000 {
 				world.reset();
 			}
+			sleep(Duration::from_millis(1000));
 			continue;
 		}
 		world.update();
