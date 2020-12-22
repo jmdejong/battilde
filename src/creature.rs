@@ -43,7 +43,7 @@ pub struct Creature {
 }
 
 impl Creature {
-	pub fn new_player(playerid: PlayerId, sprite: Sprite, pos: Pos) -> Self {
+	pub fn new_player(playerid: PlayerId, sprite: Sprite, pos: Pos, pvp: bool) -> Self {
 		Self {
 			mind: Mind::Player(playerid.clone()),
 			pos,
@@ -61,7 +61,7 @@ impl Creature {
 				aim: 1,
 				accuracy: 12
 			},
-			alignment: Alignment::Players,
+			alignment: if pvp {Alignment::Player(playerid.clone())} else {Alignment::Players},
 		}
 	}
 	

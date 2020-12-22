@@ -20,6 +20,7 @@ use crate::{
 	item::Item,
 	player::Player,
 	waves::wave_composition,
+	gamemode::GameMode
 };
 
 
@@ -39,6 +40,7 @@ pub struct World {
 	to_spawn: Vec<MonsterType>,
 	pause: i64,
 	gameover: i64,
+	gamemode: GameMode,
 }
 
 impl World {
@@ -70,7 +72,7 @@ impl World {
 		} 
 	}
 	
-	pub fn new() -> Self {
+	pub fn new(gamemode: GameMode) -> Self {
 		
 		let size = (64, 64);
 		
@@ -88,7 +90,8 @@ impl World {
 			wave: 0,
 			to_spawn: Vec::new(),
 			pause: 0,
-			gameover: 0
+			gameover: 0,
+			gamemode,
 		};
 		world.generate_map();
 		world
@@ -338,7 +341,12 @@ impl World {
 		// spawn players
 		for (playerid, player) in self.players.iter_mut() {
 			if !self.creatures.contains_key(&player.body) {
-				let body = self.creatures.insert(Creature::new_player(playerid.clone(), player.sprite.clone(), self.spawnpoint));
+				let body = self.creatures.insert(Creature::new_player(
+					playerid.clone(),
+					player.sprite.clone(),
+					self.spawnpoint,
+					self.gamemode == GameMode::PvP
+				));
 				player.body = body
 			}
 			player.plan = None;
@@ -347,7 +355,7 @@ impl World {
 		// spawn monsters
 		let nmonsters = self.creatures.values().filter(|c| c.alignment == Alignment::Monsters).count();
 		let nplayers = std::cmp::max(self.players.len(), 1);
-		if nmonsters == 0 && self.to_spawn.is_empty() {
+		if self.gamemode == GameMode::Cooperative && nmonsters == 0 && self.to_spawn.is_empty() {
 			self.wave += 1;
 			self.pause = 25;
 			self.to_spawn = wave_composition(self.wave, nplayers);
@@ -389,14 +397,18 @@ impl World {
 		self.update_bullets();
 		let mut dead_positions = Vec::new();
 		self.creatures.retain(|_id, creature| if creature.health <= 0 {
-			if creature.alignment == Alignment::Monsters {
+			if creature.alignment != Alignment::Players {
 				dead_positions.push(creature.pos);
 			}
 			false
 		} else {true});
 		self.spawn(dead_positions);
 		
-		if self.creatures.values().filter(|c| c.mind == Mind::Pillar && c.alignment == Alignment::Players).count() == 0 {
+		if self.gamemode == GameMode::Cooperative 
+				&& self.creatures.values().filter(|c|
+					c.mind == Mind::Pillar 
+					&& c.alignment == Alignment::Players
+				).count() == 0 {
 			self.gameover = 50;
 		}
 		self.time.0 += 1;

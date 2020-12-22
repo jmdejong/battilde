@@ -1,6 +1,9 @@
 
 use structopt::StructOpt;
-use crate::Address;
+use crate::{
+	Address,
+	gamemode::GameMode
+};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "Rustifarm", about = "Asciifarm server in Rust")]
@@ -15,4 +18,6 @@ pub struct Config {
 	#[structopt(long, default_value="100", help="The time (in milliseconds) between two steps")]
 	pub step_duration: u64,
 	
+	#[structopt(long, default_value="coop", help="The gamemode of the server. Options: coop, pvp")]
+	pub game_mode: GameMode
 }

@@ -23,6 +23,7 @@ mod creature;
 mod tile;
 mod item;
 mod waves;
+mod gamemode;
 
 use self::{
 	pos::{Pos, Direction},
@@ -67,9 +68,7 @@ fn main(){
 	
 	let mut gameserver = GameServer::new(servers, config.admins);
 	
-
-
-	let mut world = World::new();
+	let mut world = World::new(config.game_mode);
 	
 	let mut message_cache = MessageCache::default();
 	
