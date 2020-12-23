@@ -95,7 +95,7 @@ fn main(){
 	
 	println!("asciifarm started on {}", Utc::now());
 	
-	let mut empty_timer = 0;
+	let mut empty_timer = 1000000;
 	
 	while running.load(Ordering::SeqCst) {
 		empty_timer += 1;
@@ -128,7 +128,7 @@ fn main(){
 			if empty_timer == 3000 {
 				world.reset();
 			}
-			sleep(Duration::from_millis(1000));
+			sleep(Duration::from_millis(500));
 			continue;
 		}
 		world.update();
