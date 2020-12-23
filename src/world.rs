@@ -27,7 +27,7 @@ use crate::{
 
 pub struct World {
 	time: Timestamp,
-	size: (i64, i64),
+	size: Pos,
 	ground: HashMap<Pos, Tile>,
 	players: HashMap<PlayerId, Player>,
 	creatures: Holder<Creature>,
@@ -51,7 +51,7 @@ impl World {
 	pub fn new(gamemode: GameMode, map: MapType) -> Self {
 		
 		let mut world = World {
-			size: (0, 0),
+			size: Pos::new(0, 0),
 			spawnpoint: Pos::new(0, 0),
 			ground: HashMap::new(),
 			players: HashMap::new(),
@@ -394,7 +394,7 @@ impl World {
 	pub fn update(&mut self) {
 		if self.gameover > 0 {
 			let mut rng = thread_rng();
-			let gopos = Pos::new(rng.gen_range(0..(self.size.0 - 10)), rng.gen_range(0..self.size.1));
+			let gopos = Pos::new(rng.gen_range(0..(self.size.x - 10)), rng.gen_range(0..self.size.y));
 			for (i, c) in "GAME_OVER!".chars().enumerate() {
 				let mut spritename = "emptyletter-".to_string();
 				spritename.push(c);
@@ -446,13 +446,11 @@ impl World {
 			sprites.entry(*pos).or_insert(Vec::new()).insert(0, sprite.clone());
 		}
 		
-		let (width, height) = self.size;
-		let size = width * height;
-		let mut values :Vec<usize> = Vec::with_capacity(size as usize);
+		let mut values :Vec<usize> = Vec::with_capacity((self.size.x * self.size.y) as usize);
 		let mut mapping: Vec<Vec<Sprite>> = Vec::new();
 		let emptyvec = Vec::new();
-		for y in 0..height {
-			for x in 0..width {
+		for y in 0..self.size.y {
+			for x in 0..self.size.x {
 				let sprs: &Vec<Sprite> = sprites.get(&Pos{x, y}).unwrap_or(&emptyvec);
 				values.push(
 					match mapping.iter().position(|x| x == sprs) {
@@ -469,8 +467,8 @@ impl World {
 		}
 		
 		FieldMessage {
-			width: self.size.0,
-			height: self.size.1,
+			width: self.size.x,
+			height: self.size.y,
 			field: values,
 			mapping
 		}

@@ -15,7 +15,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MapTemplate {
-	pub size: (i64, i64),
+	pub size: Pos,
 	pub ground: HashMap<Pos, Tile>,
 	pub creatures: Vec<(Pos, CreatureType)>,
 	pub spawnpoint: Pos,
@@ -52,16 +52,17 @@ pub fn create_map(typ: &MapType) -> MapTemplate {
 
 
 fn create_square_map() -> MapTemplate {
+	let size = Pos::new(64, 64);
 	let mut map = MapTemplate {
-		size: (64, 64),
+		size,
 		ground: HashMap::new(),
 		creatures: Vec::new(),
-		spawnpoint: Pos::new(32, 32),
-		monsterspawn: vec![Pos::new(0,0), Pos::new(63, 0), Pos::new(0, 63), Pos::new(63, 63)],
+		spawnpoint: Pos::new(size.x / 2, size.y / 2),
+		monsterspawn: vec![Pos::new(0,0), Pos::new(size.x - 1, 0), Pos::new(0, size.y - 1), Pos::new(size.x - 1, size.y - 1)],
 	};
 
-	for x in 0..map.size.0 {
-		for y in 0..map.size.1 {
+	for x in 0..map.size.x {
+		for y in 0..map.size.y {
 			let dspawn = (Pos::new(x, y) - map.spawnpoint).abs();
 			let floor = if dspawn.x <= 3 && dspawn.y <= 3 {
 				Tile::Sanctuary
@@ -110,7 +111,7 @@ impl<'de> Deserialize<'de> for MapTemplate {
 			}
 		}
 		Ok(MapTemplate {
-			size: (size.x, size.y),
+			size,
 			spawnpoint,
 			creatures,
 			monsterspawn,
