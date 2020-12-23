@@ -6,7 +6,7 @@ use CreatureType::*;
 pub fn wave_composition(wave: usize, nplayers: usize) -> Vec<CreatureType> {
 	let mut monsters = Vec::new();
 	let wavedef = [
-		vec![(Zombie, 5)],
+		vec![(Zombie, 5)], // wave 0 is normally skipped, but just in case
 		vec![(Zombie, 8)],
 		vec![(Zombie, 12)],
 		vec![(Zombie, 10 + 3 * nplayers), (Ymp, (nplayers+1)/2)],

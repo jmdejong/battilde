@@ -69,6 +69,7 @@ impl Pos {
 		(other - *self).size()
 	}
 	
+	#[allow(dead_code)]
 	pub fn directions_to(&self, other: Pos) -> Vec<Direction> {
 		let mut directions = Vec::new();
 		let d = other - *self;

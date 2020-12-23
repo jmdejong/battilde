@@ -23,7 +23,8 @@ pub enum CreatureType {
 	Zombie,
 	Ymp,
 	Troll,
-	Pillar
+	Pillar,
+	Player
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,6 +48,7 @@ pub struct Creature {
 	pub sprite: Sprite,
 	pub alignment: Alignment,
 	pub ammo: Ammo,
+	pub is_building: bool
 }
 
 impl Creature {
@@ -69,6 +71,7 @@ impl Creature {
 				accuracy: 12
 			},
 			alignment: if pvp {Alignment::Player(playerid.clone())} else {Alignment::Players},
+			is_building: false
 		}
 	}
 	
@@ -90,7 +93,8 @@ impl Creature {
 				aim: 10,
 				accuracy: 10
 			},
-			alignment: Alignment::Players
+			alignment: Alignment::Players,
+			is_building: true
 		}
 	}
 	
@@ -112,7 +116,8 @@ impl Creature {
 				aim: 10,
 				accuracy: 10
 			},
-			alignment: Alignment::Monsters
+			alignment: Alignment::Monsters,
+			is_building: false
 		}
 	}
 	
@@ -134,7 +139,8 @@ impl Creature {
 				aim: 120,
 				accuracy: 20
 			},
-			alignment: Alignment::Monsters
+			alignment: Alignment::Monsters,
+			is_building: false
 		}
 	}
 	
@@ -156,13 +162,15 @@ impl Creature {
 				aim: 120,
 				accuracy: 20
 			},
-			alignment: Alignment::Monsters
+			alignment: Alignment::Monsters,
+			is_building: false
 		}
 	}
 	
 	
 	pub fn create_creature(typ: CreatureType, pos: Pos) -> Self{
 		match typ {
+			CreatureType::Player => Self::new_player(PlayerId("".to_string()), Sprite("player_g:X".to_string()), pos, true), // will probably commite suicide immediately
 			CreatureType::Zombie => Self::new_zombie(pos),
 			CreatureType::Ymp => Self::new_ymp(pos),
 			CreatureType::Troll => Self::new_troll(pos),

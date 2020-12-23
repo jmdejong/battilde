@@ -70,6 +70,7 @@ impl<T> Holder<T> {
 		self.storage.contains_key(key)
 	}
 	
+	#[allow(dead_code)]
 	#[inline]
 	pub fn retain<F>(&mut self, f: F)
 	where

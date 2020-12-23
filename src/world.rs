@@ -1,5 +1,5 @@
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use rand::{Rng, thread_rng, seq::SliceRandom};
 
 use crate::{
@@ -42,6 +42,8 @@ pub struct World {
 	gameover: i64,
 	gamemode: GameMode,
 	map: MapType,
+	building_distances: HashMap<Pos, usize>,
+	player_distances: HashMap<Pos, usize>
 }
 
 impl World {
@@ -65,6 +67,8 @@ impl World {
 			gameover: 0,
 			gamemode,
 			map,
+			building_distances: HashMap::new(),
+			player_distances: HashMap::new()
 		};
 		world.reset();
 		world
@@ -80,6 +84,25 @@ impl World {
 		self.pause = 0;
 		self.gameover = 0;
 		self.set_map(create_map(&self.map));
+		self.compute_building_distances();
+	}
+	
+	fn compute_player_distances(&mut self) {
+		self.player_distances = self.distance_map(
+			&self.creatures.values()
+				.filter(|c| !c.is_building && c.alignment != Alignment::Monsters)
+				.map(|c| c.pos)
+				.collect::<Vec<Pos>>()
+		);
+	}
+	
+	fn compute_building_distances(&mut self) {
+		self.building_distances = self.distance_map(
+			&self.creatures.values()
+				.filter(|c| c.is_building && c.alignment != Alignment::Monsters)
+				.map(|c| c.pos)
+				.collect::<Vec<Pos>>()
+		);
 	}
 	
 	fn set_map(&mut self, template: MapTemplate) {
@@ -122,21 +145,18 @@ impl World {
 	
 	
 	fn distance_map(&self, targets: &[Pos]) -> HashMap<Pos, usize>{
-		let mut frontier: Vec<(Pos, usize)> = targets.iter().map(|pos| (*pos, 0)).collect();
+		let mut frontier: VecDeque<(Pos, usize)> = targets.iter().map(|pos| (*pos, 0)).collect();
 		let mut known: HashMap<Pos, usize> = HashMap::new();
-		while !frontier.is_empty() {
-			let (pos, cost) = frontier.remove(0);
-// 			println!("{:?}")
-			if known.contains_key(&pos) && *known.get(&pos).unwrap() <= cost {
+		while let Some((pos, cost)) = frontier.pop_front() {
+			if known.contains_key(&pos){
 				continue;
 			}
 			known.insert(pos, cost);
-			if let Some(tile) = self.ground.get(&pos) {
-				if tile.blocking(){
-					continue;
-				}
-				for dir in &Direction::DIRECTIONS {
-					frontier.push((pos + *dir, cost + 1));
+			for dir in &Direction::DIRECTIONS {
+				if let Some(tile) = self.ground.get(&(pos + *dir)) {
+					if !tile.blocking(){
+						frontier.push_back((pos + *dir, cost + 1));
+					}
 				}
 			}
 		}
@@ -165,9 +185,7 @@ impl World {
 		}
 		let mut dirs: Vec<Direction> = Direction::DIRECTIONS.iter().cloned().collect();
 		dirs.shuffle(&mut thread_rng());
-		if let Some(target_pos) = target {
-			dirs.sort_by_key(|dir| (creature.pos + *dir - target_pos).size());
-		}
+		dirs.sort_by_key(|dir| distance_map.get(&(creature.pos + *dir)).unwrap_or(&std::usize::MAX));
 		for dir in dirs{
 			let newpos = creature.pos + dir;
 			if let Some(tile) = self.ground.get(&newpos) {
@@ -179,7 +197,7 @@ impl World {
 		None
 	}
 	
-	fn creature_plan(&self, creature: &Creature, player_distance: &HashMap<Pos, usize>, building_distance: &HashMap<Pos, usize>) -> Option<Control> {
+	fn creature_plan(&self, creature: &Creature) -> Option<Control> {
 		match &creature.mind {
 			Mind::Player(playerid) => {
 				if let Some(player) = self.players.get(&playerid) {
@@ -189,20 +207,20 @@ impl World {
 			Mind::Zombie => {
 				self.monster_plan(
 					creature,
-					player_distance,
+					&self.player_distances,
 					|player| 
 						player.alignment != creature.alignment 
-						&& player.mind != Mind::Pillar 
+						&& !player.is_building 
 						&& self.ground.get(&player.pos) != Some(&Tile::Sanctuary)
 				)
 			}
 			Mind::Destroyer => {
 				self.monster_plan(
 					creature,
-					building_distance,
+					&self.building_distances,
 					|player| 
 						player.alignment != creature.alignment 
-						&& player.mind == Mind::Pillar
+						&& player.is_building
 				)
 			}
 			Mind::Pillar => None
@@ -213,20 +231,11 @@ impl World {
 		let mut creature_map: HashMap<Pos, usize> = self.creatures.iter()
 			.map(|(creatureid, creature)| (creature.pos, *creatureid))
 			.collect();
-// 		let mut player_positions = Vec::new();
-// 		let mut building_positions = Vec::new();
-// 		for creature in self.creatures.values().filter(|c| c.alignment != Alignment::Monsters) {
-// 			if creature.mind == Mind::Pillar {
-// 				building_positions.push(creature.pos);
-// 			} else {
-// 				player_positions.push(creature.pos);
-// 			}
-// 		}
-		let player_distance = HashMap::new();//self.distance_map(&player_positions);
-		let building_distance = HashMap::new();//self.distance_map(&building_positions);
+		self.compute_player_distances();
 		let plans: HashMap<usize, Control> = self.creatures.iter()
+			.filter(|(_k, c)| c.cooldown == 0)
 			.filter_map(|(k, c)|
-				Some((*k, self.creature_plan(c, &player_distance, &building_distance)?))
+				Some((*k, self.creature_plan(c)?))
 			).collect();
 		for (id, creature) in self.creatures.iter_mut() {
 			if creature.health <= 0 {
@@ -341,7 +350,7 @@ impl World {
 		}).collect();
 	}
 	
-	fn spawn(&mut self, dead_positions: Vec<Pos>){
+	fn spawn(&mut self, dead_creatures: Vec<Creature>){
 		
 		// spawn players
 		for (playerid, player) in self.players.iter_mut() {
@@ -375,9 +384,9 @@ impl World {
 		}
 		
 		// spawn items
-		for pos in dead_positions {
-			if self.items.len() < nplayers + 1  && thread_rng().gen_range(0..10) == 0{
-				self.items.insert(pos, Item::Health);
+		for creature in dead_creatures {
+			if creature.alignment != Alignment::Players && self.items.len() < nplayers + 1  && thread_rng().gen_range(0..10) == 0{
+				self.items.insert(creature.pos, Item::Health);
 			}
 		}
 	}
@@ -400,14 +409,17 @@ impl World {
 		self.particles.clear();
 		self.update_creatures();
 		self.update_bullets();
-		let mut dead_positions = Vec::new();
-		self.creatures.retain(|_id, creature| if creature.health <= 0 {
-			if creature.alignment != Alignment::Players {
-				dead_positions.push(creature.pos);
+		let mut dead_creatures = Vec::new();
+		let creatureids: Vec<usize> = self.creatures.keys().cloned().collect();
+		for creatureid in creatureids {
+			if self.creatures.get(&creatureid).unwrap().health <= 0 {
+				dead_creatures.push(self.creatures.remove(&creatureid).unwrap());
 			}
-			false
-		} else {true});
-		self.spawn(dead_positions);
+		}
+		if dead_creatures.iter().any(|c|c.is_building && c.alignment == Alignment::Players){
+			self.compute_building_distances();
+		}
+		self.spawn(dead_creatures);
 		
 		if self.gamemode == GameMode::Cooperative 
 				&& self.creatures.values().filter(|c|
