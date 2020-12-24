@@ -20,7 +20,8 @@ use crate::{
 	player::Player,
 	waves::wave_composition,
 	gamemode::GameMode,
-	mapgen::{MapTemplate, MapType, create_map}
+	mapgen::{MapTemplate, MapType, create_map},
+	grid::Grid
 };
 
 
@@ -28,7 +29,7 @@ use crate::{
 pub struct World {
 	time: Timestamp,
 	size: Pos,
-	ground: HashMap<Pos, Tile>,
+	ground: Grid<Tile>,
 	players: HashMap<PlayerId, Player>,
 	creatures: Holder<Creature>,
 	bullets: Vec<Bullet>,
@@ -42,8 +43,8 @@ pub struct World {
 	gameover: i64,
 	gamemode: GameMode,
 	map: MapType,
-	building_distances: HashMap<Pos, usize>,
-	player_distances: HashMap<Pos, usize>,
+	building_distances: Grid<Option<usize>>,
+	player_distances: Grid<Option<usize>>,
 	drawing: Option<HashMap<Pos, Vec<Sprite>>>,
 }
 
@@ -54,7 +55,7 @@ impl World {
 		let mut world = World {
 			size: Pos::new(0, 0),
 			spawnpoint: Pos::new(0, 0),
-			ground: HashMap::new(),
+			ground: Grid::empty(),
 			players: HashMap::new(),
 			creatures: Holder::new(),
 			bullets: Vec::new(),
@@ -68,8 +69,8 @@ impl World {
 			gameover: 0,
 			gamemode,
 			map,
-			building_distances: HashMap::new(),
-			player_distances: HashMap::new(),
+			building_distances: Grid::empty(),
+			player_distances: Grid::empty(),
 			drawing: None,
 		};
 		world.reset();
@@ -142,16 +143,16 @@ impl World {
 		);
 	}
 	
-	fn distance_map(&self, targets: &[Pos]) -> HashMap<Pos, usize>{
+	fn distance_map(&self, targets: &[Pos]) -> Grid<Option<usize>>{
 		let mut frontier: VecDeque<(Pos, usize)> = targets.iter().map(|pos| (*pos, 0)).collect();
-		let mut known: HashMap<Pos, usize> = HashMap::new();
+		let mut known: Grid<Option<usize>> = Grid::new(self.size, None);
 		while let Some((pos, cost)) = frontier.pop_front() {
-			if known.contains_key(&pos){
+			if known.get_unchecked(pos).is_some(){
 				continue;
 			}
-			known.insert(pos, cost);
+			known.set_unchecked(pos, Some(cost));
 			for dir in &Direction::DIRECTIONS {
-				if let Some(tile) = self.ground.get(&(pos + *dir)) {
+				if let Some(tile) = self.ground.get(pos + *dir) {
 					if !tile.blocking(){
 						frontier.push_back((pos + *dir, cost + 1));
 					}
@@ -161,7 +162,7 @@ impl World {
 		known
 	}
 	
-	fn monster_plan<F>(&self, creature: &Creature, distance_map: &HashMap<Pos, usize>, is_target: F) -> Option<Control>
+	fn monster_plan<F>(&self, creature: &Creature, distance_map: &Grid<Option<usize>>, is_target: F) -> Option<Control>
 			where F: Fn(&Creature) -> bool {
 		// find nearest attackable target
 		let mut target = None;
@@ -183,10 +184,10 @@ impl World {
 		}
 		let mut dirs: Vec<Direction> = Direction::DIRECTIONS.iter().cloned().collect();
 		dirs.shuffle(&mut thread_rng());
-		dirs.sort_by_key(|dir| distance_map.get(&(creature.pos + *dir)).unwrap_or(&std::usize::MAX));
+		dirs.sort_by_key(|dir| distance_map.get(creature.pos + *dir).unwrap_or(&None).unwrap_or(std::usize::MAX));
 		for dir in dirs{
 			let newpos = creature.pos + dir;
-			if let Some(tile) = self.ground.get(&newpos) {
+			if let Some(tile) = self.ground.get(newpos) {
 				if !tile.blocking() {
 					return Some(Control::Move(dir));
 				}
@@ -209,7 +210,7 @@ impl World {
 					|player| 
 						player.alignment != creature.alignment 
 						&& !player.is_building 
-						&& self.ground.get(&player.pos) != Some(&Tile::Sanctuary)
+						&& self.ground.get(player.pos) != Some(&Tile::Sanctuary)
 				)
 			}
 			Mind::Destroyer => {
@@ -239,7 +240,7 @@ impl World {
 			if creature.health <= 0 {
 				continue;
 			}
-			if self.ground.get(&creature.pos) == Some(&Tile::Sanctuary) || self.pause > 0{
+			if self.ground.get(creature.pos) == Some(&Tile::Sanctuary) || self.pause > 0 {
 				creature.health += if creature.is_building {20} else {2};
 				if creature.health > creature.max_health {
 					creature.health = creature.max_health;
@@ -254,11 +255,11 @@ impl World {
 				Some(Control::Move(direction)) => {
 					creature.dir = *direction;
 					let newpos = creature.pos + *direction;
-					if let Some(tile) = self.ground.get(&newpos) {
+					if let Some(tile) = self.ground.get(newpos) {
 						if (
 								!tile.blocking()
 									|| tile == &Tile::Gate
-										&& self.ground.get(&creature.pos) == Some(&Tile::Sanctuary)
+										&& self.ground.get(creature.pos) == Some(&Tile::Sanctuary)
 										&& creature.health >= creature.max_health)
 								&& !creature_map.contains_key(&newpos) {
 							if creature_map.get(&creature.pos) == Some(id){
@@ -282,7 +283,7 @@ impl World {
 					if let Some(direction) = dir {
 						creature.dir = *direction;
 					}
-					if !self.ground.get(&creature.pos).unwrap().blocking(){
+					if !self.ground.get(creature.pos).unwrap().blocking(){
 						self.bullets.push(Bullet{
 							direction: creature.dir.to_position(),
 							pos: creature.pos,
@@ -293,7 +294,7 @@ impl World {
 					}
 				}
 				Some(Control::ShootPrecise(dirvec)) => {
-					if !self.ground.get(&creature.pos).unwrap().blocking(){
+					if !self.ground.get(creature.pos).unwrap().blocking(){
 						self.bullets.push(Bullet{
 							direction: *dirvec,
 							pos: creature.pos,
@@ -338,7 +339,7 @@ impl World {
 					}
 				}
 				/* hit static geometry */
-				if let Some(tile) = self.ground.get(&bullet.pos) {
+				if let Some(tile) = self.ground.get(bullet.pos) {
 					if tile.bullet_blocking(){
 						return None;
 					}
@@ -440,7 +441,7 @@ impl World {
 			sprites.entry(*pos).or_insert(Vec::new()).push(item.sprite());
 		}
 		sprites.into_iter().filter_map(|(pos, mut sprs)| {
-			sprs.push(self.ground.get(&pos)?.sprite());
+			sprs.push(self.ground.get(pos)?.sprite());
 			Some((pos, sprs))
 		}).collect()
 	}
@@ -448,7 +449,7 @@ impl World {
 	fn draw_changes(&self, mut sprites: HashMap<Pos, Vec<Sprite>>) -> Option<ChangeMessage> { 
 		if let Some(last_drawing) = &self.drawing {
 			for pos in last_drawing.keys() {
-				sprites.entry(*pos).or_insert(vec![self.ground.get(pos)?.sprite()]);
+				sprites.entry(*pos).or_insert(vec![self.ground.get(*pos)?.sprite()]);
 			}
 			let sprs: ChangeMessage = sprites.iter()
 				.filter(|(pos, spritelist)| last_drawing.get(pos) != Some(spritelist))
@@ -493,13 +494,13 @@ impl World {
 }
 
 
-fn draw_field(size: Pos, tiles: &HashMap<Pos, Tile>, sprites: &HashMap<Pos, Vec<Sprite>>) -> FieldMessage {
+fn draw_field(size: Pos, tiles: &Grid<Tile>, sprites: &HashMap<Pos, Vec<Sprite>>) -> FieldMessage {
 	println!("redrawing field");
 	let mut values :Vec<usize> = Vec::with_capacity((size.x * size.y) as usize);
 	let mut mapping: Vec<Vec<Sprite>> = Vec::new();
 	for y in 0..size.y {
 		for x in 0..size.x {
-			let tilesprite = vec![tiles.get(&Pos::new(x, y)).unwrap().sprite()];
+			let tilesprite = vec![tiles.get_unchecked(Pos::new(x, y)).sprite()];
 			let sprs: &Vec<Sprite> = sprites.get(&Pos{x, y}).unwrap_or(&tilesprite);
 			values.push(
 				match mapping.iter().position(|x| x == sprs) {

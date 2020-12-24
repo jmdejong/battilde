@@ -26,6 +26,7 @@ mod item;
 mod waves;
 mod gamemode;
 mod mapgen;
+mod grid;
 
 use self::{
 	pos::{Pos, Direction},
