@@ -10,6 +10,6 @@ impl Item {
 	pub fn sprite(&self) -> Sprite {
 		Sprite(match self {
 			Self::Health => "health"
-		}.to_string())
+		})
 	}
 }

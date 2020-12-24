@@ -1,4 +1,4 @@
-
+#![recursion_limit="512"]
 use std::thread::sleep;
 use std::time::Duration;
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
@@ -125,7 +125,7 @@ fn main(){
 			}
 		}
 		if world.nplayers() == 0 && empty_timer > 100 {
-			if empty_timer == 3000 {
+			if empty_timer == 600 {
 				world.reset();
 			}
 			sleep(Duration::from_millis(500));

@@ -12,28 +12,15 @@ use crate::{
 	controls::{Control, Action},
 	server::Server,
 	sprite::Sprite,
-	PlayerId,
-	util
+	PlayerId
 };
 
-fn is_valid_player_sprite(sprite: Sprite) -> bool {
-	let (prefix, name) = util::partition_by(&sprite.0, "_");
-	if prefix.as_str() != "player" {
-		return false;
-	}
-	let (colour, character) = util::partition_by(&name, "-");
-	let chars: Vec<char> = character.chars().collect();
-	if chars.len() != 1 || !chars[0].is_ascii_uppercase(){
-		return false;
-	}
-	return "r g b c m y lr lg lb lc lm ly g".split(' ').any(|col| col == colour);
-}
 
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all="lowercase")]
 enum Message {
-	Introduction(String, Sprite),
+	Introduction(String, String),
 	Chat(String),
 	Input(Value)
 }
@@ -141,10 +128,8 @@ impl GameServer {
 	fn handle_message(&mut self, (serverid, connectionid): (usize, usize), msg: Message) -> Result<Option<Action>, MessageError> {
 		let id = (serverid, connectionid);
 		match msg {
-			Message::Introduction(name, sprite) => {
-				if !is_valid_player_sprite(sprite.clone()) {
-					return Err(merr!(name, format!("Invalid player sprite: {}", sprite)));
-				}
+			Message::Introduction(name, spritename) => {
+				let sprite = Sprite::player_sprite(&spritename).ok_or(merr!(name, format!("Invalid player sprite: {}", spritename)))?;
 				if name.len() > 99 {
 					return Err(merr!(name, "A name can not be longer than 99 bytes"));
 				}

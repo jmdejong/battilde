@@ -2,9 +2,11 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 use serde::{Serialize, de, Deserialize, Deserializer};
+use rand::Rng;
 use crate::{
 	Pos,
-	tile::{Tile, FloorType, WallType},
+	Direction,
+	tile::{Tile, FloorType, WallType, ObstacleType},
 	creature::CreatureType,
 	util::randomize,
 	errors::AnyError,
@@ -71,19 +73,33 @@ fn create_square_map() -> MapTemplate {
 			} else if dspawn.x <= 1 || dspawn.y <= 1 {
 				Tile::Floor(FloorType::Dirt)
 			} else {
-				Tile::Floor([FloorType::Grass1, FloorType::Grass2, FloorType::Grass3][randomize(x as u32 + randomize(y as u32)) as usize % 3])
+				Tile::Floor([FloorType::Grass1, FloorType::Grass2, FloorType::Grass3][randomize((x+1) as u32 + randomize((y+1) as u32)) as usize % 3])
 			};
 			map.ground.insert(Pos::new(x, y), floor);
 		}
 	}
 	let d: Vec<(i64, i64)> = vec![(1, 1), (1, -1), (-1, 1), (-1, -1)];
-	let p: Vec<(i64, i64)> = vec![(3, 3), (4, 3), (4, 2), (3, 4), (2, 4)];
 	for (dx, dy) in d {
-		for (px, py) in p.iter() {
+		for (px, py) in &[(3, 3), (4, 3), (4, 2), (3, 4), (2, 4)] {
 			map.ground.insert(map.spawnpoint + Pos::new(px * dx, py * dy), Tile::Wall(WallType::Wall));
 		}
 		map.ground.insert(map.spawnpoint + Pos::new(4 * dx, 4 * dy), Tile::Wall(WallType::Rubble));
 		map.creatures.push((map.spawnpoint + Pos::new(4*dx, 4*dy), CreatureType::Pillar));
+		
+		if rand::random() {
+			let lakepos = Pos::new(
+					rand::thread_rng().gen_range(12..size.x / 2 - 8) * dx,
+					rand::thread_rng().gen_range(12..size.y / 2 - 8) * dy
+				) + map.spawnpoint;
+			let mut p = lakepos;
+			for _i in 0..16 {
+				map.ground.insert(p, Tile::Obstacle(ObstacleType::Water));
+				p = p + Direction::DIRECTIONS[rand::thread_rng().gen_range(0..4)];
+				if lakepos.distance_to(p) > 4{
+					break;
+				}
+			}
+		}
 	}
 	map
 }

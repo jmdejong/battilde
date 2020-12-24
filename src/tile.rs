@@ -20,11 +20,17 @@ pub enum WallType{
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ObstacleType{
+	Water,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tile {
 	Floor(FloorType),
 	Sanctuary,
 	Gate,
-	Wall(WallType)
+	Wall(WallType),
+	Obstacle(ObstacleType),
 }
 
 
@@ -40,15 +46,27 @@ impl Tile {
 			Tile::Sanctuary => "sanctuary",
 			Tile::Wall(WallType::Wall) => "wall",
 			Tile::Wall(WallType::Rubble) => "rubble",
-			Tile::Wall(WallType::Rock) => "rock"
-		}.to_string())
+			Tile::Wall(WallType::Rock) => "rock",
+			Tile::Obstacle(ObstacleType::Water) => "water"
+		})
 	}
 	pub fn blocking(&self) -> bool {
 		match self {
 			Tile::Floor(_) => false,
 			Tile::Sanctuary => false,
 			Tile::Wall(_) => true,
-			Tile::Gate => true
+			Tile::Gate => true,
+			Tile::Obstacle(_) => true
+		}
+	}
+	
+	pub fn bullet_blocking(&self) -> bool {
+		match self {
+			Tile::Floor(_) => false,
+			Tile::Sanctuary => false,
+			Tile::Wall(_) => true,
+			Tile::Gate => true,
+			Tile::Obstacle(_) => false
 		}
 	}
 	
@@ -64,6 +82,7 @@ impl Tile {
 			'#' => Tile::Wall(WallType::Wall),
 			'X' => Tile::Wall(WallType::Rock),
 			'R' => Tile::Wall(WallType::Rubble),
+			'~' => Tile::Obstacle(ObstacleType::Water),
 			_ => {return None}
 		})
 	}

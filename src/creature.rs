@@ -66,7 +66,7 @@ impl Creature {
 				damage: 10,
 				range: 32,
 				speed: 3,
-				sprites: vec![Sprite("bulletvert".to_string()), Sprite("bullethor".to_string())],
+				sprites: vec![Sprite("bulletvert"), Sprite("bullethor")],
 				aim: 1,
 				accuracy: 12
 			},
@@ -84,12 +84,12 @@ impl Creature {
 			max_health: 200,
 			cooldown: rand::random::<i64>() % 3,
 			max_cooldown: 2,
-			sprite: Sprite("pillar".to_string()),
+			sprite: Sprite("pillar"),
 			ammo: Ammo {
 				damage: 10,
 				range: 1,
 				speed: 2,
-				sprites: vec![Sprite("bite".to_string())],
+				sprites: vec![Sprite("bite")],
 				aim: 10,
 				accuracy: 10
 			},
@@ -107,12 +107,12 @@ impl Creature {
 			max_health: 20,
 			cooldown: rand::random::<i64>() % 3,
 			max_cooldown: 2,
-			sprite: Sprite("zombie".to_string()),
+			sprite: Sprite("zombie"),
 			ammo: Ammo {
 				damage: 10,
 				range: 1,
 				speed: 2,
-				sprites: vec![Sprite("bite".to_string())],
+				sprites: vec![Sprite("bite")],
 				aim: 10,
 				accuracy: 10
 			},
@@ -130,12 +130,12 @@ impl Creature {
 			max_health: 20,
 			cooldown: rand::random::<i64>() % 3,
 			max_cooldown: 2,
-			sprite: Sprite("ymp".to_string()),
+			sprite: Sprite("ymp"),
 			ammo: Ammo {
 				damage: 10,
 				range: 24,
 				speed: 1,
-				sprites: vec![Sprite("bullet".to_string())],
+				sprites: vec![Sprite("bullet")],
 				aim: 120,
 				accuracy: 20
 			},
@@ -153,12 +153,12 @@ impl Creature {
 			max_health: 100,
 			cooldown: thread_rng().gen_range(0..3),
 			max_cooldown: 4,
-			sprite: Sprite("troll".to_string()),
+			sprite: Sprite("troll"),
 			ammo: Ammo {
 				damage: 50,
 				range: 2,
 				speed: 1,
-				sprites: vec![Sprite("bullet".to_string())],
+				sprites: vec![Sprite("bullet")],
 				aim: 120,
 				accuracy: 20
 			},
@@ -170,7 +170,7 @@ impl Creature {
 	
 	pub fn create_creature(typ: CreatureType, pos: Pos) -> Self{
 		match typ {
-			CreatureType::Player => Self::new_player(PlayerId("".to_string()), Sprite("player_g:X".to_string()), pos, true), // will probably commite suicide immediately
+			CreatureType::Player => Self::new_player(PlayerId("".to_string()), Sprite("player_g:X"), pos, true), // will probably commite suicide immediately
 			CreatureType::Zombie => Self::new_zombie(pos),
 			CreatureType::Ymp => Self::new_ymp(pos),
 			CreatureType::Troll => Self::new_troll(pos),

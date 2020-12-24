@@ -11,7 +11,7 @@ use crate::{
 	Direction,
 	holder::Holder,
 	sprite::Sprite,
-	worldmessages::{WorldMessage, FieldMessage},
+	worldmessages::{WorldMessage, FieldMessage, ChangeMessage},
 	Timestamp,
 	creature::{Creature, Mind, CreatureType, Alignment},
 	tile::Tile,
@@ -43,7 +43,8 @@ pub struct World {
 	gamemode: GameMode,
 	map: MapType,
 	building_distances: HashMap<Pos, usize>,
-	player_distances: HashMap<Pos, usize>
+	player_distances: HashMap<Pos, usize>,
+	drawing: Option<HashMap<Pos, Vec<Sprite>>>,
 }
 
 impl World {
@@ -68,7 +69,8 @@ impl World {
 			gamemode,
 			map,
 			building_distances: HashMap::new(),
-			player_distances: HashMap::new()
+			player_distances: HashMap::new(),
+			drawing: None,
 		};
 		world.reset();
 		world
@@ -83,29 +85,7 @@ impl World {
 		self.to_spawn.clear();
 		self.pause = 0;
 		self.gameover = 0;
-		self.set_map(create_map(&self.map));
-		self.compute_building_distances();
-	}
-	
-	fn compute_player_distances(&mut self) {
-		self.player_distances = self.distance_map(
-			&self.creatures.values()
-				.filter(|c| !c.is_building && c.alignment != Alignment::Monsters)
-				.map(|c| c.pos)
-				.collect::<Vec<Pos>>()
-		);
-	}
-	
-	fn compute_building_distances(&mut self) {
-		self.building_distances = self.distance_map(
-			&self.creatures.values()
-				.filter(|c| c.is_building && c.alignment != Alignment::Monsters)
-				.map(|c| c.pos)
-				.collect::<Vec<Pos>>()
-		);
-	}
-	
-	fn set_map(&mut self, template: MapTemplate) {
+		let template: MapTemplate = create_map(&self.map);
 		self.size = template.size;
 		self.ground = template.ground;
 		self.spawnpoint = template.spawnpoint;
@@ -113,6 +93,8 @@ impl World {
 		for (pos, creature) in template.creatures {
 			self.creatures.insert(Creature::create_creature(creature, pos));
 		}
+		self.drawing = None;
+		self.compute_building_distances();
 	}
 	
 	pub fn add_player(&mut self, playerid: &PlayerId, sprite: Sprite) -> Result<()> {
@@ -124,7 +106,8 @@ impl World {
 			Player{
 				plan: None,
 				sprite: sprite.clone(),
-				body: 0
+				body: 0,
+				is_new: true
 			}
 		);
 		Ok(())
@@ -136,13 +119,28 @@ impl World {
 		Ok(())
 	}
 	
-	
 	pub fn control_player(&mut self, playerid: PlayerId, control: Control) -> Result<()>{
 		let player = self.players.get_mut(&playerid).ok_or(aerr!("player not found"))?;
 		player.plan = Some(control);
 		Ok(())
 	}
 	
+	fn compute_player_distances(&mut self) {
+		self.player_distances = self.distance_map(
+			&self.creatures.values()
+				.filter(|c| !c.is_building && c.alignment != Alignment::Monsters)
+				.map(|c| c.pos)
+				.collect::<Vec<Pos>>()
+		);
+	}
+	fn compute_building_distances(&mut self) {
+		self.building_distances = self.distance_map(
+			&self.creatures.values()
+				.filter(|c| c.is_building && c.alignment != Alignment::Monsters)
+				.map(|c| c.pos)
+				.collect::<Vec<Pos>>()
+		);
+	}
 	
 	fn distance_map(&self, targets: &[Pos]) -> HashMap<Pos, usize>{
 		let mut frontier: VecDeque<(Pos, usize)> = targets.iter().map(|pos| (*pos, 0)).collect();
@@ -242,7 +240,7 @@ impl World {
 				continue;
 			}
 			if self.ground.get(&creature.pos) == Some(&Tile::Sanctuary) || self.pause > 0{
-				creature.health += 2;
+				creature.health += if creature.is_building {20} else {2};
 				if creature.health > creature.max_health {
 					creature.health = creature.max_health;
 				}
@@ -341,7 +339,7 @@ impl World {
 				}
 				/* hit static geometry */
 				if let Some(tile) = self.ground.get(&bullet.pos) {
-					if tile.blocking(){
+					if tile.bullet_blocking(){
 						return None;
 					}
 				}
@@ -396,9 +394,7 @@ impl World {
 			let mut rng = thread_rng();
 			let gopos = Pos::new(rng.gen_range(0..(self.size.x - 10)), rng.gen_range(0..self.size.y));
 			for (i, c) in "GAME_OVER!".chars().enumerate() {
-				let mut spritename = "emptyletter-".to_string();
-				spritename.push(c);
-				self.particles.insert(Pos::new(gopos.x + (i as i64), gopos.y), Sprite(spritename));
+				self.particles.insert(Pos::new(gopos.x + (i as i64), gopos.y), Sprite::letter_sprite(c).unwrap());
 			}
 			self.gameover -= 1;
 			if self.gameover == 0 {
@@ -432,55 +428,52 @@ impl World {
 	}
 	
 	
-	fn draw(&self) -> FieldMessage {
-		let mut sprites: HashMap<Pos, Vec<Sprite>> = self.ground.iter()
-			.map(|(pos, tile)| (*pos, vec![tile.sprite()]))
-			.collect();
-		for (pos, item) in self.items.iter() {
-			sprites.entry(*pos).or_insert(Vec::new()).insert(0, item.sprite());
+	fn draw_dynamic(&self) -> HashMap<Pos, Vec<Sprite>> {
+		let mut sprites: HashMap<Pos, Vec<Sprite>> = HashMap::new();
+		for (pos, sprite) in self.particles.iter() {
+			sprites.insert(*pos, vec![*sprite]);
 		}
 		for creature in self.creatures.values() {
-			sprites.entry(creature.pos).or_insert(Vec::new()).insert(0, creature.sprite.clone());
+			sprites.entry(creature.pos).or_insert(Vec::new()).push(creature.sprite);
 		}
-		for (pos, sprite) in self.particles.iter() {
-			sprites.entry(*pos).or_insert(Vec::new()).insert(0, sprite.clone());
+		for (pos, item) in self.items.iter() {
+			sprites.entry(*pos).or_insert(Vec::new()).push(item.sprite());
 		}
-		
-		let mut values :Vec<usize> = Vec::with_capacity((self.size.x * self.size.y) as usize);
-		let mut mapping: Vec<Vec<Sprite>> = Vec::new();
-		let emptyvec = Vec::new();
-		for y in 0..self.size.y {
-			for x in 0..self.size.x {
-				let sprs: &Vec<Sprite> = sprites.get(&Pos{x, y}).unwrap_or(&emptyvec);
-				values.push(
-					match mapping.iter().position(|x| x == sprs) {
-						Some(index) => {
-							index
-						}
-						None => {
-							mapping.push(sprs.to_vec());
-							mapping.len() - 1
-						}
-					}
-				)
-			}
-		}
-		
-		FieldMessage {
-			width: self.size.x,
-			height: self.size.y,
-			field: values,
-			mapping
-		}
+		sprites.into_iter().filter_map(|(pos, mut sprs)| {
+			sprs.push(self.ground.get(&pos)?.sprite());
+			Some((pos, sprs))
+		}).collect()
 	}
 	
+	fn draw_changes(&self, mut sprites: HashMap<Pos, Vec<Sprite>>) -> Option<ChangeMessage> { 
+		if let Some(last_drawing) = &self.drawing {
+			for pos in last_drawing.keys() {
+				sprites.entry(*pos).or_insert(vec![self.ground.get(pos)?.sprite()]);
+			}
+			let sprs: ChangeMessage = sprites.iter()
+				.filter(|(pos, spritelist)| last_drawing.get(pos) != Some(spritelist))
+				.map(|(pos, spritelist)| (*pos, spritelist.clone()))
+				.collect();
+			Some(sprs)
+		} else {None}
+	}
 	
-	pub fn view(&self) -> HashMap<PlayerId, WorldMessage> {
-		let fm = self.draw();
+	pub fn view(&mut self) -> HashMap<PlayerId, WorldMessage> {
+		let dynamic_sprites = self.draw_dynamic();
+		let changes = self.draw_changes(dynamic_sprites.clone());
+		let mut field = None;
 		let mut views: HashMap<PlayerId, WorldMessage> = HashMap::new();
-		for (playerid, player) in self.players.iter() {
+		for (playerid, player) in self.players.iter_mut() {
 			let mut wm = WorldMessage::default();
-			wm.field = Some(fm.clone());
+			if changes.is_some() && !player.is_new {
+				wm.change = changes.clone();
+			} else {
+				if field.is_none(){
+					field = Some(draw_field(self.size, &self.ground, &dynamic_sprites));
+				}
+				wm.field = Some(field.clone().unwrap());
+				player.is_new = false;
+			}
 			if let Some(body) = self.creatures.get(&player.body){
 				wm.pos = Some(body.pos);
 				wm.health = Some((body.health, body.max_health));
@@ -490,11 +483,42 @@ impl World {
 				views.insert(playerid.clone(), wm);
 			}
 		}
+		self.drawing = Some(dynamic_sprites);
 		views
 	}
 	
 	pub fn nplayers(&self) -> usize {
 		self.players.len()
+	}
+}
+
+
+fn draw_field(size: Pos, tiles: &HashMap<Pos, Tile>, sprites: &HashMap<Pos, Vec<Sprite>>) -> FieldMessage {
+	println!("redrawing field");
+	let mut values :Vec<usize> = Vec::with_capacity((size.x * size.y) as usize);
+	let mut mapping: Vec<Vec<Sprite>> = Vec::new();
+	for y in 0..size.y {
+		for x in 0..size.x {
+			let tilesprite = vec![tiles.get(&Pos::new(x, y)).unwrap().sprite()];
+			let sprs: &Vec<Sprite> = sprites.get(&Pos{x, y}).unwrap_or(&tilesprite);
+			values.push(
+				match mapping.iter().position(|x| x == sprs) {
+					Some(index) => {
+						index
+					}
+					None => {
+						mapping.push(sprs.to_vec());
+						mapping.len() - 1
+					}
+				}
+			)
+		}
+	}
+	FieldMessage {
+		width: size.x,
+		height: size.y,
+		field: values,
+		mapping
 	}
 }
 

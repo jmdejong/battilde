@@ -29,6 +29,7 @@ pub fn randomize (mut seed: u32) -> u32 {
 	seed
 }
 
+#[allow(dead_code)]
 pub fn partition_by(s: &str, pat: &str) -> (String, String) {
 	let mut parts: Vec<String> = s.splitn(2, pat).map(String::from).collect();
 	while parts.len() < 2 {

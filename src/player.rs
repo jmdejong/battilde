@@ -20,5 +20,6 @@ impl fmt::Display for PlayerId {
 pub struct Player {
 	pub plan: Option<Control>,
 	pub sprite: Sprite,
-	pub body: usize
+	pub body: usize,
+	pub is_new: bool
 }
