@@ -367,11 +367,10 @@ impl World {
 		
 		// spawn monsters
 		let nmonsters = self.creatures.values().filter(|c| c.alignment == Alignment::Monsters).count();
-		let nplayers = std::cmp::max(self.players.len(), 1);
 		if self.gamemode == GameMode::Cooperative && nmonsters == 0 && self.to_spawn.is_empty() {
 			self.wave += 1;
 			self.pause = 25;
-			self.to_spawn = wave_composition(self.wave, nplayers);
+			self.to_spawn = wave_composition(self.wave);
 		}
 		if self.pause > 0 {
 			self.pause -= 1;
@@ -382,6 +381,7 @@ impl World {
 			));
 		}
 		
+		let nplayers = std::cmp::max(self.players.len(), 1);
 		// spawn items
 		for creature in dead_creatures {
 			if creature.alignment != Alignment::Players && self.items.len() < nplayers + 1  && thread_rng().gen_range(0..10) == 0{

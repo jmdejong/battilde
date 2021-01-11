@@ -22,6 +22,7 @@ pub enum Mind {
 pub enum CreatureType {
 	Zombie,
 	Ymp,
+	Worm,
 	Troll,
 	Pillar,
 	Player
@@ -167,12 +168,36 @@ impl Creature {
 		}
 	}
 	
+	pub fn new_worm(pos: Pos) -> Self {
+		Self {
+			mind: Mind::Destroyer,
+			pos,
+			dir: Direction::North,
+			health: 12,
+			max_health: 12,
+			cooldown: thread_rng().gen_range(0..3),
+			max_cooldown: 3,
+			sprite: Sprite("worm"),
+			ammo: Ammo {
+				damage: 10,
+				range: 2,
+				speed: 1,
+				sprites: vec![Sprite("bullet")],
+				aim: 120,
+				accuracy: 20
+			},
+			alignment: Alignment::Monsters,
+			is_building: false
+		}
+	}
+	
 	
 	pub fn create_creature(typ: CreatureType, pos: Pos) -> Self{
 		match typ {
 			CreatureType::Player => Self::new_player(PlayerId("".to_string()), Sprite("player_g:X"), pos, true), // will probably commite suicide immediately
 			CreatureType::Zombie => Self::new_zombie(pos),
 			CreatureType::Ymp => Self::new_ymp(pos),
+			CreatureType::Worm => Self::new_worm(pos),
 			CreatureType::Troll => Self::new_troll(pos),
 			CreatureType::Pillar => Self::new_pillar(pos),
 		}

@@ -3,22 +3,33 @@ use crate::creature::CreatureType;
 use CreatureType::*;
 
 
-pub fn wave_composition(wave: usize, nplayers: usize) -> Vec<CreatureType> {
+pub fn wave_composition(wave: usize) -> Vec<CreatureType> {
 	let mut monsters = Vec::new();
 	let wavedef = [
 		vec![(Zombie, 5)], // wave 0 is normally skipped, but just in case
 		vec![(Zombie, 8)],
-		vec![(Zombie, 12)],
-		vec![(Zombie, 10 + 3 * nplayers), (Ymp, (nplayers+1)/2)],
-		vec![(Zombie, 12 + 4 * nplayers), (Ymp, (nplayers+1)/2)],
-		vec![(Zombie, 12 + 4 * nplayers), (Ymp, nplayers+1)],
-		vec![(Zombie, 10 + 3 * nplayers), (Troll, 1)],
-		vec![(Zombie, 12 + 4 * nplayers), (Ymp, (nplayers+2)/2), (Troll, 1)],
-		vec![(Zombie, 12 + 4 * nplayers), (Troll, 2)],
-		vec![(Zombie, wave + 5 * nplayers), (Ymp, nplayers + wave / 3), (Zombie, wave + 5), (Troll, nplayers + wave / 4)]
+		vec![(Zombie, 12), (Worm, 2)],
+		vec![(Zombie, 13 ), (Ymp, 1), (Worm, 2)],
+		vec![(Zombie, 16), (Ymp, 2), (Worm, 1)],
+		vec![(Zombie, 16 ), (Ymp, 2), (Worm, 2)],
+		vec![(Zombie, 12), (Worm, 1), (Troll, 1)],
+		vec![(Zombie, 16), (Ymp, 2), (Worm, 2)],
+		vec![(Zombie, 16), (Troll, 2)],
 	];
-	let idx = std::cmp::min(wave, wavedef.len() - 1);
-	for (typ, num) in &wavedef[idx] {
+	let postwavenum = if wave >= wavedef.len(){wave - wavedef.len()} else {0};
+	let postwaves = vec![
+		(Zombie, 12 + postwavenum),
+		(Ymp, 1 + (3 + postwavenum) / 3),
+		(Worm, postwavenum/2 + 1),
+		(Zombie, postwavenum + 5),
+		(Troll, 1)
+	];
+	let composition = if wave < wavedef.len(){
+			&wavedef[wave]
+		} else {
+			&postwaves
+		};
+	for (typ, num) in composition {
 		monsters.append(&mut [*typ].repeat(*num));
 	}
 	monsters
