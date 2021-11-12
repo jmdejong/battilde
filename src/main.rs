@@ -94,7 +94,7 @@ fn main(){
 	}).expect("can't set close handler");
 	
 	
-	println!("asciifarm started on {}", Utc::now());
+	println!("battilde started on {}", Utc::now());
 	
 	let mut empty_timer = 1000000;
 	

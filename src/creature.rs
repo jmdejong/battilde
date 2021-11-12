@@ -76,6 +76,13 @@ impl Creature {
 		}
 	}
 	
+	pub fn is_player(&self) -> bool {
+		match self.mind {
+			Mind::Player(_) => true,
+			_ => false
+		}
+	}
+	
 	pub fn new_pillar(pos: Pos) -> Self {
 		Self {
 			mind: Mind::Pillar,

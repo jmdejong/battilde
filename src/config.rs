@@ -20,7 +20,7 @@ pub struct Config {
 	#[structopt(long, default_value="100", help="The time (in milliseconds) between two steps")]
 	pub step_duration: u64,
 	
-	#[structopt(long, default_value="coop", help="The gamemode of the server. Options: coop, pvp")]
+	#[structopt(long, default_value="survival", help="The gamemode of the server. Options: survival, pillars, pvp")]
 	pub game_mode: GameMode,
 	
 	#[structopt(long, default_value="square", help="The built-in map to play. Ignored if --custom-map is used.")]

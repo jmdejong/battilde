@@ -367,7 +367,7 @@ impl World {
 		
 		// spawn monsters
 		let nmonsters = self.creatures.values().filter(|c| c.alignment == Alignment::Monsters).count();
-		if self.gamemode == GameMode::Cooperative && nmonsters == 0 && self.to_spawn.is_empty() {
+		if self.gamemode != GameMode::PvP && nmonsters == 0 && self.to_spawn.is_empty() {
 			self.wave += 1;
 			self.pause = 25;
 			self.to_spawn = wave_composition(self.wave);
@@ -418,14 +418,22 @@ impl World {
 		}
 		self.spawn(dead_creatures);
 		
-		if self.gamemode == GameMode::Cooperative 
-				&& self.creatures.values().filter(|c|
-					c.mind == Mind::Pillar 
-					&& c.alignment == Alignment::Players
-				).count() == 0 {
+		if self.is_game_over() {
 			self.gameover = 50;
 		}
 		self.time.0 += 1;
+	}
+	
+	fn is_game_over(&self) -> bool {
+		match self.gamemode {
+			GameMode::PillarDefence =>
+				!self.creatures.values()
+					.any(|c| c.mind == Mind::Pillar && c.alignment == Alignment::Players),
+			GameMode::Survival =>
+				self.wave > 1 && !self.creatures.values()
+					.any(|c| c.is_player() && self.ground.get(c.pos) != Some(&Tile::Sanctuary)),
+			GameMode::PvP => false
+		}
 	}
 	
 	
