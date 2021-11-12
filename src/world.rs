@@ -24,7 +24,21 @@ use crate::{
 	grid::Grid
 };
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum RoundState {
+	Running,
+	GameOver(i64),
+	Paused(i64)
+}
 
+impl RoundState {	
+	fn is_paused(&self) -> bool {
+		match self {
+			Self::Paused(_) => true,
+			_ => false
+		}
+	}
+}
 
 pub struct World {
 	time: Timestamp,
@@ -39,8 +53,7 @@ pub struct World {
 	items: HashMap<Pos, Item>,
 	wave: usize,
 	to_spawn: Vec<CreatureType>,
-	pause: i64,
-	gameover: i64,
+	round_state: RoundState,
 	gamemode: GameMode,
 	map: MapType,
 	building_distances: Grid<Option<usize>>,
@@ -65,8 +78,7 @@ impl World {
 			items: HashMap::new(),
 			wave: 0,
 			to_spawn: Vec::new(),
-			pause: 0,
-			gameover: 0,
+			round_state: RoundState::Running,
 			gamemode,
 			map,
 			building_distances: Grid::empty(),
@@ -84,8 +96,7 @@ impl World {
 		self.items.clear();
 		self.wave = 0;
 		self.to_spawn.clear();
-		self.pause = 0;
-		self.gameover = 0;
+		self.round_state = RoundState::Running;
 		let template: MapTemplate = create_map(&self.map);
 		self.size = template.size;
 		self.ground = template.ground;
@@ -95,6 +106,9 @@ impl World {
 			self.creatures.insert(Creature::create_creature(creature, pos));
 		}
 		self.drawing = None;
+		for player in self.players.values_mut() {
+			player.is_new = true;
+		}
 		self.compute_building_distances();
 	}
 	
@@ -240,7 +254,7 @@ impl World {
 			if creature.health <= 0 {
 				continue;
 			}
-			if self.ground.get(creature.pos) == Some(&Tile::Sanctuary) || self.pause > 0 {
+			if self.ground.get(creature.pos) == Some(&Tile::Sanctuary) || self.round_state.is_paused() {
 				creature.health += if creature.is_building {20} else {2};
 				if creature.health > creature.max_health {
 					creature.health = creature.max_health;
@@ -369,11 +383,16 @@ impl World {
 		let nmonsters = self.creatures.values().filter(|c| c.alignment == Alignment::Monsters).count();
 		if self.gamemode != GameMode::PvP && nmonsters == 0 && self.to_spawn.is_empty() {
 			self.wave += 1;
-			self.pause = 25;
+			self.round_state = RoundState::Paused(25);
 			self.to_spawn = wave_composition(self.wave);
 		}
-		if self.pause > 0 {
-			self.pause -= 1;
+		if let RoundState::Paused(pause) = self.round_state {
+			
+			self.round_state = if pause <= 0 {
+				RoundState::Running
+			} else {
+				RoundState::Paused(pause - 1)
+			};
 		} else if self.time.0 % 5 == 0 && !self.to_spawn.is_empty() {
 			self.creatures.insert(Creature::create_creature(
 				self.to_spawn.remove(0),
@@ -391,37 +410,43 @@ impl World {
 	}
 	
 	pub fn update(&mut self) {
-		if self.gameover > 0 {
-			let mut rng = thread_rng();
-			let gopos = Pos::new(rng.gen_range(0..(self.size.x - 10)), rng.gen_range(0..self.size.y));
-			for (i, c) in "GAME_OVER!".chars().enumerate() {
-				self.particles.insert(Pos::new(gopos.x + (i as i64), gopos.y), Sprite::letter_sprite(c).unwrap());
+		match self.round_state {
+			RoundState::Running | RoundState::Paused(_) => {
+				self.particles.clear();
+				self.update_creatures();
+				self.update_bullets();
+				let mut dead_creatures = Vec::new();
+				let creatureids: Vec<usize> = self.creatures.keys().cloned().collect();
+				for creatureid in creatureids {
+					if self.creatures.get(&creatureid).unwrap().health <= 0 {
+						dead_creatures.push(self.creatures.remove(&creatureid).unwrap());
+					}
+				}
+				if dead_creatures.iter().any(|c|c.is_building && c.alignment == Alignment::Players){
+					self.compute_building_distances();
+				}
+				self.spawn(dead_creatures);
+				
+				if self.is_game_over() {
+					self.round_state = RoundState::GameOver(50);
+				}
+				self.time.0 += 1;
 			}
-			self.gameover -= 1;
-			if self.gameover == 0 {
-				self.reset();
+			
+			
+			RoundState::GameOver(time_left) => {
+				let mut rng = thread_rng();
+				let gopos = Pos::new(rng.gen_range(0..(self.size.x - 10)), rng.gen_range(0..self.size.y));
+				for (i, c) in "GAME_OVER!".chars().enumerate() {
+					self.particles.insert(Pos::new(gopos.x + (i as i64), gopos.y), Sprite::letter_sprite(c).unwrap());
+				}
+				if time_left <= 0 {
+					self.reset();
+				} else {
+					self.round_state = RoundState::GameOver(time_left - 1);
+				}
 			}
-			return
 		}
-		self.particles.clear();
-		self.update_creatures();
-		self.update_bullets();
-		let mut dead_creatures = Vec::new();
-		let creatureids: Vec<usize> = self.creatures.keys().cloned().collect();
-		for creatureid in creatureids {
-			if self.creatures.get(&creatureid).unwrap().health <= 0 {
-				dead_creatures.push(self.creatures.remove(&creatureid).unwrap());
-			}
-		}
-		if dead_creatures.iter().any(|c|c.is_building && c.alignment == Alignment::Players){
-			self.compute_building_distances();
-		}
-		self.spawn(dead_creatures);
-		
-		if self.is_game_over() {
-			self.gameover = 50;
-		}
-		self.time.0 += 1;
 	}
 	
 	fn is_game_over(&self) -> bool {
@@ -486,11 +511,11 @@ impl World {
 			if let Some(body) = self.creatures.get(&player.body){
 				wm.pos = Some(body.pos);
 				wm.health = Some((body.health, body.max_health));
-				if self.pause == 1 {
-					wm.sounds = Some(vec![("wave".to_string(), format!("**** Wave {} *****", self.wave), None)]);
-				}
-				views.insert(playerid.clone(), wm);
 			}
+			if self.round_state == RoundState::Paused(1) {
+				wm.sounds = Some(vec![("wave".to_string(), format!("**** Wave {} *****", self.wave), None)]);
+			}
+			views.insert(playerid.clone(), wm);
 		}
 		self.drawing = Some(dynamic_sprites);
 		views
