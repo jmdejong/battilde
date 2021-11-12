@@ -10,7 +10,8 @@ use crate::{
 	util::randomize,
 	errors::AnyError,
 	aerr,
-	grid::Grid
+	grid::Grid,
+	gamemode::GameMode
 };
 
 
@@ -45,15 +46,15 @@ pub enum MapType {
 	Custom(MapTemplate)
 }
 
-pub fn create_map(typ: &MapType) -> MapTemplate {
+pub fn create_map(typ: &MapType, gamemode: GameMode) -> MapTemplate {
 	match typ {
-		MapType::Builtin(BuiltinMap::Square) => create_square_map(),
+		MapType::Builtin(BuiltinMap::Square) => create_square_map(gamemode),
 		MapType::Custom(template) => template.clone()
 	}
 }
 
 
-fn create_square_map() -> MapTemplate {
+fn create_square_map(gamemode: GameMode) -> MapTemplate {
 	let size = Pos::new(64, 64);
 	let mut map = MapTemplate {
 		size,
@@ -82,11 +83,13 @@ fn create_square_map() -> MapTemplate {
 	
 	let d: Vec<(i64, i64)> = vec![(1, 1), (1, -1), (-1, 1), (-1, -1)];
 	for (dx, dy) in d {
-		for (px, py) in &[(3, 3), (4, 3), (4, 2), (3, 4), (2, 4)] {
+		for (px, py) in &[(3, 3), (4, 3), (4, 2), (3, 4), (2, 4), (4, 4)] {
 			map.ground.set(map.spawnpoint + Pos::new(px * dx, py * dy), Tile::Wall(WallType::Wall));
 		}
-		map.ground.set(map.spawnpoint + Pos::new(4 * dx, 4 * dy), Tile::Wall(WallType::Rubble));
-		map.creatures.push((map.spawnpoint + Pos::new(4*dx, 4*dy), CreatureType::Pillar));
+		if gamemode.has_pillars() {
+			map.ground.set(map.spawnpoint + Pos::new(4 * dx, 4 * dy), Tile::Wall(WallType::Rubble));
+			map.creatures.push((map.spawnpoint + Pos::new(4*dx, 4*dy), CreatureType::Pillar));
+		}
 		
 		if rand::random() {
 			let lakepos = Pos::new(

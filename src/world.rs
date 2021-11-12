@@ -97,7 +97,7 @@ impl World {
 		self.wave = 0;
 		self.to_spawn.clear();
 		self.round_state = RoundState::Running;
-		let template: MapTemplate = create_map(&self.map);
+		let template: MapTemplate = create_map(&self.map, self.gamemode);
 		self.size = template.size;
 		self.ground = template.ground;
 		self.spawnpoint = template.spawnpoint;
@@ -384,7 +384,11 @@ impl World {
 		if self.gamemode != GameMode::PvP && nmonsters == 0 && self.to_spawn.is_empty() {
 			self.wave += 1;
 			self.round_state = RoundState::Paused(25);
-			self.to_spawn = wave_composition(self.wave);
+			self.to_spawn =
+				wave_composition(self.wave)
+					.into_iter()
+					.flat_map(|typ| self.spawn_modify(typ))
+					.collect();
 		}
 		if let RoundState::Paused(pause) = self.round_state {
 			
@@ -406,6 +410,18 @@ impl World {
 			if creature.alignment != Alignment::Players && self.items.len() < nplayers + 1  && thread_rng().gen_range(0..10) == 0{
 				self.items.insert(creature.pos, Item::Health);
 			}
+		}
+	}
+	
+	fn spawn_modify(&self, stored: CreatureType) -> Vec<CreatureType> {
+		if self.gamemode == GameMode::Survival {
+			match stored {
+				CreatureType::Worm => vec![CreatureType::Zombie, CreatureType::Zombie, CreatureType::Zombie],
+				CreatureType::Troll => vec![CreatureType::Ymp, CreatureType::Ymp, CreatureType::Zombie],
+				other => vec![other]
+			}
+		} else {
+			vec![stored]
 		}
 	}
 	

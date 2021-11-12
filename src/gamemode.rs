@@ -12,6 +12,13 @@ pub enum GameMode {
 	PvP
 }
 
+impl GameMode {
+	
+	pub fn has_pillars(self) -> bool {
+		self == Self::PillarDefence
+	}
+}
+
 impl FromStr for GameMode {
 	type Err = AnyError;
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
