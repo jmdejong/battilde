@@ -15,7 +15,7 @@ pub enum Mind {
 	Player(PlayerId),
 	Zombie,
 	Destroyer,
-	Pillar
+	Pillar,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -25,7 +25,9 @@ pub enum CreatureType {
 	Worm,
 	Troll,
 	Pillar,
-	Player
+	Player,
+	Vargr,
+	Xiangliu
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -198,6 +200,59 @@ impl Creature {
 		}
 	}
 	
+	fn new_xiangliu(pos: Pos) -> Self {
+		Self::new_monster(
+			pos,
+			Mind::Zombie,
+			50,
+			0,
+			Sprite("xiangliu"),
+			Ammo {
+				damage: 10,
+				range: 12,
+				speed: 1,
+				sprites: vec![Sprite("bullet")],
+				aim: 1,
+				accuracy: 1
+			}
+		)
+	}
+	
+	fn new_vargr(pos: Pos) -> Self {
+		Self::new_monster(
+			pos,
+			Mind::Zombie,
+			30,
+			1,
+			Sprite("vargr"),
+			Ammo {
+				damage: 10,
+				range: 1,
+				speed: 2,
+				sprites: vec![Sprite("bite")],
+				aim: 10,
+				accuracy: 10
+			}
+		)
+	}
+	
+	fn new_monster(pos: Pos, mind: Mind, health: i64, cooldown: i64, sprite: Sprite, ammo: Ammo) -> Self {
+		Self {
+			mind,
+			pos,
+			dir: Direction::North,
+			health,
+			max_health: health,
+			cooldown: thread_rng().gen_range(0..=cooldown),
+			max_cooldown: cooldown,
+			sprite,
+			ammo,
+			alignment: Alignment::Monsters,
+			is_building: false
+		}
+	}
+	
+	
 	
 	pub fn create_creature(typ: CreatureType, pos: Pos) -> Self{
 		match typ {
@@ -207,6 +262,9 @@ impl Creature {
 			CreatureType::Worm => Self::new_worm(pos),
 			CreatureType::Troll => Self::new_troll(pos),
 			CreatureType::Pillar => Self::new_pillar(pos),
+			CreatureType::Xiangliu => Self::new_xiangliu(pos),
+			CreatureType::Vargr => Self::new_vargr(pos)
+			
 		}
 	}
 }

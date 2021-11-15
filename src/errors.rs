@@ -15,9 +15,9 @@ impl Error for AError {
 	}
 }
 impl Display for AError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Error: {}", self.text)
-    }
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		write!(f, "Error: {}", self.text)
+	}
 }
 #[macro_export]
 macro_rules! aerr {
