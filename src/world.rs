@@ -254,11 +254,17 @@ impl World {
 			if creature.health <= 0 {
 				continue;
 			}
-			if self.ground.get(creature.pos) == Some(&Tile::Sanctuary) || self.round_state.is_paused() {
-				creature.health += if creature.is_building {20} else {2};
-				if creature.health > creature.max_health {
-					creature.health = creature.max_health;
-				}
+			let mut new_health = creature.health;
+			if self.ground.get(creature.pos) == Some(&Tile::Sanctuary) {
+				new_health += 2;
+			} else if self.round_state.is_paused() {
+				new_health += if creature.is_building {20} else {2};
+			}
+			if new_health > creature.max_health {
+				new_health = creature.max_health;
+			}
+			if new_health > creature.health {
+				creature.health = new_health;
 			}
 			if creature.cooldown > 0 {
 				creature.cooldown -= 1;
@@ -528,7 +534,9 @@ impl World {
 				wm.pos = Some(body.pos);
 				wm.health = Some((body.health, body.max_health));
 			}
-			if self.round_state == RoundState::Paused(1) {
+			if self.round_state == RoundState::GameOver(1) {
+				wm.sounds = Some(vec![("restart".to_string(), "---- Starting new session ----".to_string(), None)]);
+			} else if self.round_state == RoundState::Paused(1) {
 				wm.sounds = Some(vec![("wave".to_string(), format!("**** Wave {} *****", self.wave), None)]);
 			}
 			views.insert(playerid.clone(), wm);
