@@ -127,7 +127,7 @@ impl<'de> Deserialize<'de> for MapTemplate {
 		let mut groundmap = Grid::new(size, Tile::Floor(FloorType::Dirt));
 		for (y, line) in ground.iter().enumerate(){
 			for (x, c) in line.chars().enumerate(){
-				let tile = Tile::from_char(c).ok_or(de::Error::custom(format!("Invalid tile character '{}'", c)))?;
+				let tile = Tile::from_char(c).ok_or_else(||de::Error::custom(format!("Invalid tile character '{}'", c)))?;
 				groundmap.set(Pos::new(x as i64, y as i64), tile);
 			}
 		}

@@ -67,9 +67,9 @@ impl Bullet {
 	pub fn sprite(&self) -> Sprite {
 		let sprites = &self.ammo.sprites;
 		if sprites.len() > 1 && (self.direction.x.abs() > self.direction.y.abs()) {
-			sprites[1].clone()
+			sprites[1]
 		} else {
-			sprites[0].clone()
+			sprites[0]
 		}
 	}
 }

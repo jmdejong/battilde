@@ -29,7 +29,7 @@ impl Sprite {
 	
 	pub fn letter_sprite(letter: char) -> Option<Sprite> {
 		let spritename = format!("emptyletter-{}", letter);
-		Sprite::LETTERS.iter().find(|s|s.0 == &spritename).cloned()
+		Sprite::LETTERS.iter().find(|s|s.0 == spritename).cloned()
 	}
 }
 

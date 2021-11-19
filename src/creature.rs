@@ -73,16 +73,18 @@ impl Creature {
 				aim: 1,
 				accuracy: 12
 			},
-			alignment: if pvp {Alignment::Player(playerid.clone())} else {Alignment::Players},
+			alignment: 
+				if pvp {
+					Alignment::Player(playerid)
+				} else {
+					Alignment::Players
+				},
 			is_building: false
 		}
 	}
 	
 	pub fn is_player(&self) -> bool {
-		match self.mind {
-			Mind::Player(_) => true,
-			_ => false
-		}
+		matches!(self.mind, Mind::Player(_))
 	}
 	
 	pub fn new_pillar(pos: Pos) -> Self {

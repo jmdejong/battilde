@@ -33,10 +33,7 @@ enum RoundState {
 
 impl RoundState {	
 	fn is_paused(&self) -> bool {
-		match self {
-			Self::Paused(_) => true,
-			_ => false
-		}
+		matches!(self, Self::Paused(_))
 	}
 }
 
@@ -120,7 +117,7 @@ impl World {
 			playerid.clone(),
 			Player{
 				plan: None,
-				sprite: sprite.clone(),
+				sprite: sprite,
 				body: 0,
 				is_new: true
 			}
@@ -196,7 +193,7 @@ impl World {
 				return Some(Control::ShootPrecise(target_pos - creature.pos))
 			}
 		}
-		let mut dirs: Vec<Direction> = Direction::DIRECTIONS.iter().cloned().collect();
+		let mut dirs: Vec<Direction> = Direction::DIRECTIONS.to_vec();
 		dirs.shuffle(&mut thread_rng());
 		dirs.sort_by_key(|dir| distance_map.get(creature.pos + *dir).unwrap_or(&None).unwrap_or(std::usize::MAX));
 		for dir in dirs{
@@ -376,7 +373,7 @@ impl World {
 			if !self.creatures.contains_key(&player.body) {
 				let body = self.creatures.insert(Creature::new_player(
 					playerid.clone(),
-					player.sprite.clone(),
+					player.sprite,
 					self.spawnpoint,
 					self.gamemode == GameMode::PvP
 				));
@@ -490,10 +487,10 @@ impl World {
 			sprites.insert(*pos, vec![*sprite]);
 		}
 		for creature in self.creatures.values() {
-			sprites.entry(creature.pos).or_insert(Vec::new()).push(creature.sprite);
+			sprites.entry(creature.pos).or_insert_with(Vec::new).push(creature.sprite);
 		}
 		for (pos, item) in self.items.iter() {
-			sprites.entry(*pos).or_insert(Vec::new()).push(item.sprite());
+			sprites.entry(*pos).or_insert_with(Vec::new).push(item.sprite());
 		}
 		sprites.into_iter().filter_map(|(pos, mut sprs)| {
 			sprs.push(self.ground.get(pos)?.sprite());

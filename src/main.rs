@@ -53,7 +53,7 @@ fn main(){
 	println!("Server admin(s): {}", config.admins);
 	
 	let adresses = config.address
-		.unwrap_or(
+		.unwrap_or_else(||
 			(if cfg!(target_os = "linux") {
 				vec!["abstract:battilde", "inet:127.0.0.1:9221"]
 			} else {
@@ -73,8 +73,8 @@ fn main(){
 	let mut gameserver = GameServer::new(servers, config.admins);
 	
 	let map = if let Some(map_path) = config.custom_map {
-		let maptext = fs::read_to_string(&map_path).expect(&format!("can't read map {:?}", map_path));
-		let template = json5::from_str(&maptext).expect(&format!("invalid map text:\n{:?}", maptext));
+		let maptext = fs::read_to_string(&map_path).unwrap_or_else(|_| panic!("can't read map {:?}", map_path));
+		let template = json5::from_str(&maptext).unwrap_or_else(|_| panic!("invalid map text:\n{:?}", maptext));
 		MapType::Custom(template)
 	} else {
 		MapType::Builtin(config.map)

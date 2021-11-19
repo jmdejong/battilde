@@ -7,7 +7,6 @@ use mio_uds::{UnixListener, UnixStream};
 use slab::Slab;
 use nix::sys::socket::getsockopt;
 use nix::sys::socket::sockopt;
-use users;
 
 use super::streamconnection::StreamConnection;
 use super::Server;
