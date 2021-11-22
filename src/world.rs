@@ -15,7 +15,7 @@ use crate::{
 	Timestamp,
 	creature::{Creature, Mind, CreatureType, Alignment},
 	tile::Tile,
-	bullet::Bullet,
+	weapon::Bullet,
 	item::Item,
 	player::Player,
 	waves::wave_composition,
@@ -189,7 +189,7 @@ impl World {
 			}
 		}
 		if let Some(target_pos) = target {
-			if creature.pos.distance_to(target_pos) <= creature.ammo.range {
+			if creature.pos.distance_to(target_pos) <= creature.weapon.get_range() {
 				return Some(Control::ShootPrecise(target_pos - creature.pos))
 			}
 		}
@@ -267,7 +267,7 @@ impl World {
 				creature.cooldown -= 1;
 				continue;
 			}
-			creature.cooldown = creature.max_cooldown;
+			creature.cooldown = creature.walk_cooldown;
 			match plans.get(id) {
 				Some(Control::Move(direction)) => {
 					creature.dir = *direction;
@@ -301,24 +301,24 @@ impl World {
 						creature.dir = *direction;
 					}
 					if !self.ground.get(creature.pos).unwrap().blocking(){
-						self.bullets.push(Bullet{
-							direction: creature.dir.to_position(),
-							pos: creature.pos,
-							alignment: creature.alignment.clone(),
-							ammo: creature.ammo.clone(),
-							steps: Pos::new(0, 0)
-						});
+						self.bullets.append(
+							&mut creature.weapon.shoot(
+								creature.pos,
+								creature.dir.to_position(),
+								creature.alignment.clone()
+							)
+						);
 					}
 				}
 				Some(Control::ShootPrecise(dirvec)) => {
 					if !self.ground.get(creature.pos).unwrap().blocking(){
-						self.bullets.push(Bullet{
-							direction: *dirvec,
-							pos: creature.pos,
-							alignment: creature.alignment.clone(),
-							ammo: creature.ammo.clone(),
-							steps: Pos::new(0, 0)
-						});
+						self.bullets.append(
+							&mut creature.weapon.shoot(
+								creature.pos,
+								*dirvec,
+								creature.alignment.clone()
+							)
+						);
 					}
 				}
 				Some(Control::Suicide) => {

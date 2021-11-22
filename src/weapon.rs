@@ -53,7 +53,7 @@ impl Bullet {
 				self.steps.size() == 0 && dabs.y > dabs.x 
 				|| dabs.x == 0
 				|| self.steps.x * dabs.y > dabs.x * self.steps.y
-				|| dabs.x == dabs.y && rand::random() {
+				|| dabs.x == dabs.y && self.steps.x == self.steps.y && rand::random() {
 			self.steps.y += 1;
 			Pos::new(0, clamp(self.direction.y, -1, 1))
 		} else {
@@ -70,6 +70,91 @@ impl Bullet {
 			sprites[1]
 		} else {
 			sprites[0]
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct Weapon {
+	cooldown: i64,
+	ammo: Ammo,
+	nbullets: i64
+}
+
+impl Weapon {
+
+	
+	pub fn shoot(&self, pos: Pos, direction: Pos, alignment: Alignment) -> Vec<Bullet> {
+		vec![Bullet {
+			direction,
+			pos,
+			alignment: alignment,
+			ammo: self.ammo.clone(),
+			steps: Pos::new(0, 0)
+		}]
+	}
+	
+	pub fn get_range(&self) -> i64 {
+		self.ammo.range
+	}
+	
+	pub fn bite(damage: i64, cooldown: i64) -> Self {
+		Weapon {
+			cooldown,
+			ammo: Ammo {
+				damage,
+				range: 1,
+				speed: 2,
+				sprites: vec![Sprite("bite")],
+				aim: 10,
+				accuracy: 10
+			},
+			nbullets: 1
+		}
+	}
+	
+	pub fn cast(damage: i64, range: i64, cooldown: i64) -> Self {
+		Weapon {
+			cooldown,
+			nbullets: 1,
+			ammo: Ammo {
+				damage,
+				range,
+				speed: 1,
+				sprites: vec![Sprite("bullet")],
+				aim: 120,
+				accuracy: 20
+			}
+		}
+	}
+	
+	pub fn smg() -> Self {
+		Weapon {
+			cooldown: 0,
+			nbullets: 1,
+			ammo: Ammo {
+				damage: 10,
+				range: 32,
+				speed: 3,
+				sprites: vec![Sprite("bulletvert"), Sprite("bullethor")],
+				aim: 1,
+				accuracy: 12
+			}
+		}
+	}
+	
+	pub fn none() -> Self {
+		Weapon {
+			cooldown: 0,
+			nbullets: 0,
+			ammo: Ammo {
+				damage: 0,
+				range: 0,
+				speed: 1,
+				sprites: vec![],
+				aim: 1,
+				accuracy:1
+			}
 		}
 	}
 }

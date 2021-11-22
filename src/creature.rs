@@ -6,7 +6,7 @@ use crate::{
 	sprite::Sprite,
 	Pos,
 	Direction,
-	bullet::Ammo,
+	weapon::Weapon,
 	PlayerId
 };
 
@@ -46,11 +46,11 @@ pub struct Creature {
 	pub dir: Direction,
 	pub health: i64,
 	pub cooldown: i64,
-	pub max_cooldown: i64,
+	pub walk_cooldown: i64,
 	pub max_health: i64,
 	pub sprite: Sprite,
 	pub alignment: Alignment,
-	pub ammo: Ammo,
+	pub weapon: Weapon,
 	pub is_building: bool
 }
 
@@ -63,16 +63,9 @@ impl Creature {
 			health: 1,
 			max_health: 100,
 			cooldown: 0,
-			max_cooldown: 0,
+			walk_cooldown: 0,
 			sprite,
-			ammo: Ammo {
-				damage: 10,
-				range: 32,
-				speed: 3,
-				sprites: vec![Sprite("bulletvert"), Sprite("bullethor")],
-				aim: 1,
-				accuracy: 12
-			},
+			weapon: Weapon::smg(),
 			alignment: 
 				if pvp {
 					Alignment::Player(playerid)
@@ -95,16 +88,9 @@ impl Creature {
 			health: 200,
 			max_health: 200,
 			cooldown: rand::random::<i64>() % 3,
-			max_cooldown: 2,
+			walk_cooldown: 2,
 			sprite: Sprite("pillar"),
-			ammo: Ammo {
-				damage: 10,
-				range: 1,
-				speed: 2,
-				sprites: vec![Sprite("bite")],
-				aim: 10,
-				accuracy: 10
-			},
+			weapon: Weapon::none(),
 			alignment: Alignment::Players,
 			is_building: true
 		}
@@ -118,16 +104,9 @@ impl Creature {
 			health: 20,
 			max_health: 20,
 			cooldown: rand::random::<i64>() % 3,
-			max_cooldown: 2,
+			walk_cooldown: 2,
 			sprite: Sprite("zombie"),
-			ammo: Ammo {
-				damage: 10,
-				range: 1,
-				speed: 2,
-				sprites: vec![Sprite("bite")],
-				aim: 10,
-				accuracy: 10
-			},
+			weapon: Weapon::bite(10, 2),
 			alignment: Alignment::Monsters,
 			is_building: false
 		}
@@ -141,16 +120,9 @@ impl Creature {
 			health: 20,
 			max_health: 20,
 			cooldown: rand::random::<i64>() % 3,
-			max_cooldown: 2,
+			walk_cooldown: 2,
 			sprite: Sprite("ymp"),
-			ammo: Ammo {
-				damage: 10,
-				range: 24,
-				speed: 1,
-				sprites: vec![Sprite("bullet")],
-				aim: 120,
-				accuracy: 20
-			},
+			weapon: Weapon::cast(10, 24, 2),
 			alignment: Alignment::Monsters,
 			is_building: false
 		}
@@ -164,16 +136,9 @@ impl Creature {
 			health: 100,
 			max_health: 100,
 			cooldown: thread_rng().gen_range(0..3),
-			max_cooldown: 4,
+			walk_cooldown: 4,
 			sprite: Sprite("troll"),
-			ammo: Ammo {
-				damage: 50,
-				range: 2,
-				speed: 1,
-				sprites: vec![Sprite("bullet")],
-				aim: 120,
-				accuracy: 20
-			},
+			weapon: Weapon::cast(50, 2, 4),
 			alignment: Alignment::Monsters,
 			is_building: false
 		}
@@ -187,16 +152,9 @@ impl Creature {
 			health: 12,
 			max_health: 12,
 			cooldown: thread_rng().gen_range(0..3),
-			max_cooldown: 3,
+			walk_cooldown: 3,
 			sprite: Sprite("worm"),
-			ammo: Ammo {
-				damage: 10,
-				range: 2,
-				speed: 1,
-				sprites: vec![Sprite("bullet")],
-				aim: 120,
-				accuracy: 20
-			},
+			weapon: Weapon::cast(10, 2, 3),
 			alignment: Alignment::Monsters,
 			is_building: false
 		}
@@ -207,16 +165,9 @@ impl Creature {
 			pos,
 			Mind::Zombie,
 			50,
-			0,
+			2,
 			Sprite("xiangliu"),
-			Ammo {
-				damage: 10,
-				range: 12,
-				speed: 1,
-				sprites: vec![Sprite("bullet")],
-				aim: 1,
-				accuracy: 1
-			}
+			Weapon::cast(10, 12, 0),
 		)
 	}
 	
@@ -227,18 +178,11 @@ impl Creature {
 			30,
 			1,
 			Sprite("vargr"),
-			Ammo {
-				damage: 10,
-				range: 1,
-				speed: 2,
-				sprites: vec![Sprite("bite")],
-				aim: 10,
-				accuracy: 10
-			}
+			Weapon::bite(20, 3)
 		)
 	}
 	
-	fn new_monster(pos: Pos, mind: Mind, health: i64, cooldown: i64, sprite: Sprite, ammo: Ammo) -> Self {
+	fn new_monster(pos: Pos, mind: Mind, health: i64, cooldown: i64, sprite: Sprite, weapon: Weapon) -> Self {
 		Self {
 			mind,
 			pos,
@@ -246,9 +190,9 @@ impl Creature {
 			health,
 			max_health: health,
 			cooldown: thread_rng().gen_range(0..=cooldown),
-			max_cooldown: cooldown,
+			walk_cooldown: cooldown,
 			sprite,
-			ammo,
+			weapon,
 			alignment: Alignment::Monsters,
 			is_building: false
 		}

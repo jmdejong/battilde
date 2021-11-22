@@ -19,7 +19,7 @@ mod timestamp;
 mod config;
 mod errors;
 mod holder;
-mod bullet;
+mod weapon;
 mod creature;
 mod tile;
 mod item;
