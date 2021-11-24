@@ -50,8 +50,7 @@ impl Weapon {
 				range: 1,
 				speed: 2,
 				sprites: vec![Sprite("bite")],
-				aim: 10,
-				accuracy: 10
+				spreading: false
 			},
 			nbullets: 1,
 			spread_pct: 0
@@ -68,8 +67,7 @@ impl Weapon {
 				range,
 				speed: 1,
 				sprites: vec![Sprite("bullet")],
-				aim: 120,
-				accuracy: 20
+				spreading: false
 			}
 		}
 	}
@@ -81,11 +79,10 @@ impl Weapon {
 			spread_pct: 0,
 			ammo: Ammo {
 				damage: 10,
-				range: 32,
+				range: 28,
 				speed: 3,
 				sprites: vec![Sprite("bulletvert"), Sprite("bullethor")],
-				aim: 1,
-				accuracy: 12
+				spreading: true
 			}
 		}
 	}
@@ -100,8 +97,7 @@ impl Weapon {
 				range: 0,
 				speed: 1,
 				sprites: vec![],
-				aim: 1,
-				accuracy:1
+				spreading: false
 			}
 		}
 	}
@@ -114,8 +110,7 @@ pub struct Ammo {
 	pub range: i64,
 	pub sprites: Vec<Sprite>,
 	pub speed: i64,
-	pub aim: i64,
-	pub accuracy: i64
+	pub spreading: bool
 }
 
 
@@ -133,29 +128,27 @@ pub struct Bullet {
 impl Bullet {
 	
 	pub fn do_move(&mut self){
-		self.inaccurate_movement();
+		if self.ammo.spreading {
+			self.pos += self.inaccurate_movement();
+		}
 		let d = self.movement();
 		self.pos += d;
 		self.steps.x += if d.x == 0 { 0 } else { 1 };
 		self.steps.y += if d.y == 0 { 0 } else { 1 };
 	}
 	
-	fn inaccurate_movement(&mut self) {
+	fn inaccurate_movement(&self) -> Pos {
 		/* sometimes move sideways to simulate inaccuracy */
-		if self.ammo.aim == 0 {
-			let d = self.direction;
-			let ds = Pos::new(d.y, -d.x).clamp(Pos::new(-1, -1), Pos::new(1, 1));
-			let r: u8 = thread_rng().gen_range(0..4);
-			self.pos += match (ds.size(), r) {
-				(1, 1) => ds,
-				(1, 2) => -ds,
-				(2, 1) => Pos::new(ds.x, 0),
-				(2, 2) => Pos::new(0, ds.y),
-				_ => Pos::new(0, 0)
-			};
-			self.ammo.aim = self.ammo.accuracy
+		if self.steps.size() == 1 && rand::random() {
+			let r = if rand::random() { 1 } else { -1 };
+			if self.direction.y.abs() > self.direction.x.abs() {
+				Pos::new(r, 0)
+			} else {
+				Pos::new(0, r)
+			}
+		} else {
+			Pos::new(0, 0)
 		}
-		self.ammo.aim -=1;
 	}
 	
 	fn movement(&self) -> Pos {
