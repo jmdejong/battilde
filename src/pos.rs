@@ -1,6 +1,6 @@
 
 
-use std::ops::{Add, Sub, Neg};
+use std::ops::{Add, Sub, Neg, Mul, AddAssign};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use crate::util::clamp;
 
@@ -143,5 +143,22 @@ impl Neg for Pos {
     }
 }
 
+impl Mul<i64> for Pos {
+	type Output = Pos;
+	fn mul(self, n: i64) -> Pos {
+		Pos {
+			x: self.x * n,
+			y: self.y * n
+		}
+	}
+}
 
+impl AddAssign for Pos {
+    fn add_assign(&mut self, other: Self) {
+        *self = Self {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        };
+    }
+}
 

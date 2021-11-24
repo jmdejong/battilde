@@ -189,7 +189,10 @@ impl World {
 			}
 		}
 		if let Some(target_pos) = target {
-			if creature.pos.distance_to(target_pos) <= creature.weapon.get_range() {
+			let range = creature.weapon.get_range();
+			let distance = creature.pos.distance_to(target_pos);
+			if range <= 5 && distance <= range
+					|| distance * 11 <= range * 10 {
 				return Some(Control::ShootPrecise(target_pos - creature.pos))
 			}
 		}
@@ -243,7 +246,7 @@ impl World {
 			.collect();
 		self.compute_player_distances();
 		let plans: HashMap<usize, Control> = self.creatures.iter()
-			.filter(|(_k, c)| c.cooldown == 0)
+			.filter(|(_k, c)| c.cooldown <= 0)
 			.filter_map(|(k, c)|
 				Some((*k, self.creature_plan(c)?))
 			).collect();
@@ -267,9 +270,9 @@ impl World {
 				creature.cooldown -= 1;
 				continue;
 			}
-			creature.cooldown = creature.walk_cooldown;
 			match plans.get(id) {
 				Some(Control::Move(direction)) => {
+					creature.cooldown = creature.walk_cooldown;
 					creature.dir = *direction;
 					let newpos = creature.pos + *direction;
 					if let Some(tile) = self.ground.get(newpos) {
@@ -297,6 +300,7 @@ impl World {
 					}
 				}
 				Some(Control::Shoot(dir)) => {
+					creature.cooldown = creature.weapon.get_cooldown();
 					if let Some(direction) = dir {
 						creature.dir = *direction;
 					}
@@ -311,6 +315,7 @@ impl World {
 					}
 				}
 				Some(Control::ShootPrecise(dirvec)) => {
+					creature.cooldown = creature.weapon.get_cooldown();
 					if !self.ground.get(creature.pos).unwrap().blocking(){
 						self.bullets.append(
 							&mut creature.weapon.shoot(
@@ -338,11 +343,10 @@ impl World {
 			for i in 0..(bullet.ammo.speed + 1) {
 				/* bullet movement */
 				if i != 0 {
-					if bullet.ammo.range == 0 {
+					bullet.do_move();
+					if bullet.out_of_range() {
 						return None;
 					}
-					bullet.ammo.range -= 1;
-					bullet.movement();
 					/* draw the trail */
 					self.particles.insert(bullet.pos, bullet.sprite());
 				}

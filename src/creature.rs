@@ -122,7 +122,7 @@ impl Creature {
 			cooldown: rand::random::<i64>() % 3,
 			walk_cooldown: 2,
 			sprite: Sprite("ymp"),
-			weapon: Weapon::cast(10, 24, 2),
+			weapon: Weapon::cast(10, 30, 0, 2),
 			alignment: Alignment::Monsters,
 			is_building: false
 		}
@@ -138,7 +138,7 @@ impl Creature {
 			cooldown: thread_rng().gen_range(0..3),
 			walk_cooldown: 4,
 			sprite: Sprite("troll"),
-			weapon: Weapon::cast(50, 2, 4),
+			weapon: Weapon::cast(50, 2, 0, 4),
 			alignment: Alignment::Monsters,
 			is_building: false
 		}
@@ -154,7 +154,7 @@ impl Creature {
 			cooldown: thread_rng().gen_range(0..3),
 			walk_cooldown: 3,
 			sprite: Sprite("worm"),
-			weapon: Weapon::cast(10, 2, 3),
+			weapon: Weapon::cast(10, 2, 0, 3),
 			alignment: Alignment::Monsters,
 			is_building: false
 		}
@@ -167,7 +167,7 @@ impl Creature {
 			50,
 			2,
 			Sprite("xiangliu"),
-			Weapon::cast(10, 12, 0),
+			Weapon::cast(10, 16, 30, 0)
 		)
 	}
 	
