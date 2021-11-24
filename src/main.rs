@@ -33,7 +33,6 @@ use self::{
 	player::PlayerId,
 	errors::{Result},
 	sprite::Sprite,
-	timestamp::Timestamp,
 	
 	gameserver::GameServer,
 	server::Server,

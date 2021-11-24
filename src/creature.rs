@@ -7,7 +7,10 @@ use crate::{
 	Pos,
 	Direction,
 	weapon::Weapon,
-	PlayerId
+	PlayerId,
+	util::Percentage,
+	timestamp::Duration,
+	pos::Distance
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,15 +42,18 @@ pub enum Alignment {
 	Monsters
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Health(pub i64);
+
 #[derive(Debug, Clone)]
 pub struct Creature {
 	pub mind: Mind,
 	pub pos: Pos,
 	pub dir: Direction,
-	pub health: i64,
-	pub cooldown: i64,
-	pub walk_cooldown: i64,
-	pub max_health: i64,
+	pub health: Health,
+	pub max_health: Health,
+	pub cooldown: Duration,
+	pub walk_cooldown: Duration,
 	pub sprite: Sprite,
 	pub alignment: Alignment,
 	pub weapon: Weapon,
@@ -55,150 +61,30 @@ pub struct Creature {
 }
 
 impl Creature {
-	pub fn new_player(playerid: PlayerId, sprite: Sprite, pos: Pos, pvp: bool) -> Self {
-		Self {
-			mind: Mind::Player(playerid.clone()),
-			pos,
-			dir: Direction::North,
-			health: 1,
-			max_health: 100,
-			cooldown: 0,
-			walk_cooldown: 0,
-			sprite,
-			weapon: Weapon::smg(),
-			alignment: 
-				if pvp {
-					Alignment::Player(playerid)
-				} else {
-					Alignment::Players
-				},
-			is_building: false
-		}
-	}
 	
 	pub fn is_player(&self) -> bool {
 		matches!(self.mind, Mind::Player(_))
 	}
 	
-	pub fn new_pillar(pos: Pos) -> Self {
-		Self {
-			mind: Mind::Pillar,
-			pos,
-			dir: Direction::North,
-			health: 200,
-			max_health: 200,
-			cooldown: rand::random::<i64>() % 3,
-			walk_cooldown: 2,
-			sprite: Sprite("pillar"),
-			weapon: Weapon::none(),
-			alignment: Alignment::Players,
-			is_building: true
-		}
+	pub fn is_dead(&self) -> bool {
+		self.health.0 <= 0
 	}
 	
-	pub fn new_zombie(pos: Pos) -> Self {
-		Self {
-			mind: Mind::Zombie,
-			pos,
-			dir: Direction::North,
-			health: 20,
-			max_health: 20,
-			cooldown: rand::random::<i64>() % 3,
-			walk_cooldown: 2,
-			sprite: Sprite("zombie"),
-			weapon: Weapon::bite(10, 2),
-			alignment: Alignment::Monsters,
-			is_building: false
-		}
+	pub fn kill(&mut self) {
+		self.health.0 = -1;
 	}
 	
-	pub fn new_ymp(pos: Pos) -> Self {
-		Self {
-			mind: Mind::Zombie,
-			pos,
-			dir: Direction::North,
-			health: 20,
-			max_health: 20,
-			cooldown: rand::random::<i64>() % 3,
-			walk_cooldown: 2,
-			sprite: Sprite("ymp"),
-			weapon: Weapon::cast(10, 30, 0, 2),
-			alignment: Alignment::Monsters,
-			is_building: false
-		}
+	pub fn heal(&mut self, amount: Health) {
+		self.health.0 = self.health.0.max(self.max_health.0.min(self.health.0 + amount.0));
 	}
 	
-	pub fn new_troll(pos: Pos) -> Self {
-		Self {
-			mind: Mind::Destroyer,
-			pos,
-			dir: Direction::North,
-			health: 100,
-			max_health: 100,
-			cooldown: thread_rng().gen_range(0..3),
-			walk_cooldown: 4,
-			sprite: Sprite("troll"),
-			weapon: Weapon::cast(50, 2, 0, 4),
-			alignment: Alignment::Monsters,
-			is_building: false
-		}
+	pub fn has_full_health(&mut self) -> bool {
+		self.health.0 >= self.max_health.0
 	}
 	
-	pub fn new_worm(pos: Pos) -> Self {
-		Self {
-			mind: Mind::Destroyer,
-			pos,
-			dir: Direction::North,
-			health: 12,
-			max_health: 12,
-			cooldown: thread_rng().gen_range(0..3),
-			walk_cooldown: 3,
-			sprite: Sprite("worm"),
-			weapon: Weapon::cast(10, 2, 0, 3),
-			alignment: Alignment::Monsters,
-			is_building: false
-		}
+	pub fn damage(&mut self, amount: Health) {
+		self.health.0 -= amount.0;
 	}
-	
-	fn new_xiangliu(pos: Pos) -> Self {
-		Self::new_monster(
-			pos,
-			Mind::Zombie,
-			50,
-			2,
-			Sprite("xiangliu"),
-			Weapon::cast(10, 16, 30, 0)
-		)
-	}
-	
-	fn new_vargr(pos: Pos) -> Self {
-		Self::new_monster(
-			pos,
-			Mind::Zombie,
-			30,
-			1,
-			Sprite("vargr"),
-			Weapon::bite(20, 3)
-		)
-	}
-	
-	fn new_monster(pos: Pos, mind: Mind, health: i64, cooldown: i64, sprite: Sprite, weapon: Weapon) -> Self {
-		Self {
-			mind,
-			pos,
-			dir: Direction::North,
-			health,
-			max_health: health,
-			cooldown: thread_rng().gen_range(0..=cooldown),
-			walk_cooldown: cooldown,
-			sprite,
-			weapon,
-			alignment: Alignment::Monsters,
-			is_building: false
-		}
-	}
-	
-	
 	
 	pub fn create_creature(typ: CreatureType, pos: Pos) -> Self{
 		match typ {
@@ -210,7 +96,126 @@ impl Creature {
 			CreatureType::Pillar => Self::new_pillar(pos),
 			CreatureType::Xiangliu => Self::new_xiangliu(pos),
 			CreatureType::Vargr => Self::new_vargr(pos)
-			
+		}
+	}	
+	
+	pub fn new_pillar(pos: Pos) -> Self {
+		Self {
+			mind: Mind::Pillar,
+			pos,
+			dir: Direction::North,
+			health: Health(200),
+			max_health: Health(200),
+			cooldown: Duration(1),
+			walk_cooldown: Duration(1),
+			sprite: Sprite("pillar"),
+			weapon: Weapon::none(),
+			alignment: Alignment::Players,
+			is_building: true
+		}
+	}
+	
+	
+	pub fn new_player(playerid: PlayerId, sprite: Sprite, pos: Pos, pvp: bool) -> Self {
+		Self {
+			mind: Mind::Player(playerid.clone()),
+			pos,
+			dir: Direction::North,
+			health: Health(1),
+			max_health: Health(100),
+			cooldown: Duration(0),
+			walk_cooldown: Duration(0),
+			sprite,
+			weapon: Weapon::rifle(),
+			alignment: 
+				if pvp {
+					Alignment::Player(playerid)
+				} else {
+					Alignment::Players
+				},
+			is_building: false
+		}
+	}
+	
+	pub fn new_zombie(pos: Pos) -> Self {
+		Self::new_monster(
+			pos,
+			Mind::Zombie,
+			Health(20),
+			Duration(2),
+			Sprite("zombie"),
+			Weapon::bite(Health(10), Duration(2))
+		)
+	}
+	
+	pub fn new_ymp(pos: Pos) -> Self {
+		Self::new_monster(
+			pos,
+			Mind::Zombie,
+			Health(20),
+			Duration(2),
+			Sprite("ymp"),
+			Weapon::cast(Health(10), Distance(30), Percentage(0), Duration(2))
+		)
+	}
+	
+	pub fn new_troll(pos: Pos) -> Self {
+		Self::new_monster(
+			pos,
+			Mind::Destroyer,
+			Health(100),
+			Duration(4),
+			Sprite("troll"),
+			Weapon::cast(Health(50), Distance(2), Percentage(0), Duration(4))
+		)
+	}
+	
+	pub fn new_worm(pos: Pos) -> Self {
+		Self::new_monster(
+			pos,
+			Mind::Destroyer,
+			Health(12),
+			Duration(3),
+			Sprite("worm"),
+			Weapon::cast(Health(10), Distance(2), Percentage(0), Duration(3))
+		)
+	}
+	
+	fn new_xiangliu(pos: Pos) -> Self {
+		Self::new_monster(
+			pos,
+			Mind::Zombie,
+			Health(50),
+			Duration(2),
+			Sprite("xiangliu"),
+			Weapon::cast(Health(10), Distance(16), Percentage(30), Duration(0))
+		)
+	}
+	
+	fn new_vargr(pos: Pos) -> Self {
+		Self::new_monster(
+			pos,
+			Mind::Zombie,
+			Health(30),
+			Duration(1),
+			Sprite("vargr"),
+			Weapon::bite(Health(20), Duration(3))
+		)
+	}
+	
+	fn new_monster(pos: Pos, mind: Mind, health: Health, cooldown: Duration, sprite: Sprite, weapon: Weapon) -> Self {
+		Self {
+			mind,
+			pos,
+			dir: Direction::North,
+			health,
+			max_health: health,
+			cooldown: Duration(thread_rng().gen_range(0..=cooldown.0)),
+			walk_cooldown: cooldown,
+			sprite,
+			weapon,
+			alignment: Alignment::Monsters,
+			is_building: false
 		}
 	}
 }

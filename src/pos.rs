@@ -30,6 +30,9 @@ impl Direction {
 }
 
 
+#[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default)]
+pub struct Distance(pub i64);
+
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Default)]
 pub struct Pos {
 	pub x: i64,
@@ -61,11 +64,16 @@ impl Pos {
 		Pos{x: self.x.abs(), y: self.y.abs()}
 	}
 	
-	pub fn size(&self) -> i64 {
-		self.x.abs() + self.y.abs()
+	pub fn size(&self) -> Distance {
+		Distance(self.x.abs() + self.y.abs())
 	}
 	
-	pub fn distance_to(&self, other: Pos) -> i64 {
+	#[allow(dead_code)]
+	pub fn is_zero(&self) -> bool {
+		self.x == 0 && self.y == 0
+	}
+	
+	pub fn distance_to(&self, other: Pos) -> Distance {
 		(other - *self).size()
 	}
 	
@@ -149,6 +157,16 @@ impl Mul<i64> for Pos {
 		Pos {
 			x: self.x * n,
 			y: self.y * n
+		}
+	}
+}
+
+impl Mul<Distance> for Pos {
+	type Output = Pos;
+	fn mul(self, n: Distance) -> Pos {
+		Pos {
+			x: self.x * n.0,
+			y: self.y * n.0
 		}
 	}
 }

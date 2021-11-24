@@ -68,6 +68,11 @@ macro_rules! hashmap {
 	}}
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Percentage(pub i64);
+
+
+
 #[cfg(test)]
 mod tests {
 	use std::collections::HashMap;

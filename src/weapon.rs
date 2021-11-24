@@ -4,25 +4,28 @@ use rand::{thread_rng, Rng};
 use crate::{
 	sprite::Sprite,
 	Pos,
-	creature::Alignment
+	creature::{Alignment, Health},
+	util::Percentage,
+	timestamp::Duration,
+	pos::Distance
 };
 
 
 #[derive(Debug, Clone)]
 pub struct Weapon {
-	cooldown: i64,
+	cooldown: Duration,
 	ammo: Ammo,
 	nbullets: i64,
-	spread_pct: i64
+	spread: Percentage
 }
 
 impl Weapon {
 
 	
 	pub fn shoot(&self, pos: Pos, mut direction: Pos, alignment: Alignment) -> Vec<Bullet> {
-		if self.spread_pct != 0 {
+		if self.spread.0 != 0 {
 			let mut rng = thread_rng();
-			let deviation = self.spread_pct * direction.size();
+			let deviation = self.spread.0 * direction.size().0;
 			direction = direction * 100 + Pos::new(rng.gen_range(-deviation..=deviation), rng.gen_range(-deviation..=deviation));
 		}
 		vec![Bullet {
@@ -34,34 +37,34 @@ impl Weapon {
 		}]
 	}
 	
-	pub fn get_range(&self) -> i64 {
+	pub fn get_range(&self) -> Distance {
 		self.ammo.range
 	}
 	
-	pub fn get_cooldown(&self) -> i64 {
+	pub fn get_cooldown(&self) -> Duration {
 		self.cooldown
 	}
 	
-	pub fn bite(damage: i64, cooldown: i64) -> Self {
+	pub fn bite(damage: Health, cooldown: Duration) -> Self {
 		Weapon {
 			cooldown,
 			ammo: Ammo {
 				damage,
-				range: 1,
+				range: Distance(1),
 				speed: 2,
 				sprites: vec![Sprite("bite")],
 				spreading: false
 			},
 			nbullets: 1,
-			spread_pct: 0
+			spread: Percentage(0)
 		}
 	}
 	
-	pub fn cast(damage: i64, range: i64, spread_pct: i64, cooldown: i64) -> Self {
+	pub fn cast(damage: Health, range: Distance, spread: Percentage, cooldown: Duration) -> Self {
 		Weapon {
 			cooldown,
 			nbullets: 1,
-			spread_pct,
+			spread,
 			ammo: Ammo {
 				damage,
 				range,
@@ -74,12 +77,12 @@ impl Weapon {
 	
 	pub fn smg() -> Self {
 		Weapon {
-			cooldown: 0,
+			cooldown: Duration(0),
 			nbullets: 1,
-			spread_pct: 0,
+			spread: Percentage(0),
 			ammo: Ammo {
-				damage: 10,
-				range: 28,
+				damage: Health(10),
+				range: Distance(28),
 				speed: 3,
 				sprites: vec![Sprite("bulletvert"), Sprite("bullethor")],
 				spreading: true
@@ -87,14 +90,31 @@ impl Weapon {
 		}
 	}
 	
+	pub fn rifle() -> Self {
+	
+		Weapon {
+			cooldown: Duration(2),
+			nbullets: 1,
+			spread: Percentage(0),
+			ammo: Ammo {
+				damage: Health(25),
+				range: Distance(32),
+				speed: 4,
+				sprites: vec![Sprite("bulletvert"), Sprite("bullethor")],
+				spreading: false
+			}
+		}
+	
+	}
+	
 	pub fn none() -> Self {
 		Weapon {
-			cooldown: 0,
+			cooldown: Duration(0),
 			nbullets: 0,
-			spread_pct: 0,
+			spread: Percentage(0),
 			ammo: Ammo {
-				damage: 0,
-				range: 0,
+				damage: Health(0),
+				range: Distance(0),
 				speed: 1,
 				sprites: vec![],
 				spreading: false
@@ -106,8 +126,8 @@ impl Weapon {
 
 #[derive(Debug, Clone)]
 pub struct Ammo {
-	pub damage: i64,
-	pub range: i64,
+	pub damage: Health,
+	pub range: Distance,
 	pub sprites: Vec<Sprite>,
 	pub speed: i64,
 	pub spreading: bool
@@ -139,7 +159,7 @@ impl Bullet {
 	
 	fn inaccurate_movement(&self) -> Pos {
 		/* sometimes move sideways to simulate inaccuracy */
-		if self.steps.size() == 1 && rand::random() {
+		if self.steps.size() == Distance(1) && rand::random() {
 			let r = if rand::random() { 1 } else { -1 };
 			if self.direction.y.abs() > self.direction.x.abs() {
 				Pos::new(r, 0)
@@ -179,10 +199,7 @@ impl Bullet {
 
 
 fn quadrant_move_y(dir: Pos, steps: Pos) -> bool {
-	if dir.size() == 0 {
-		// doesn't matter what gets returned; the result is 0,0 anyways
-		false
-	} else if dir.y > dir.x || dir.x == dir.y && rand::random() { 
+	if dir.y > dir.x || dir.x == dir.y && rand::random() { 
 		!octant_move_y(Pos::new(dir.y, dir.x), Pos::new(steps.y, steps.x))
 	} else {
 		octant_move_y(dir, steps)
@@ -190,7 +207,7 @@ fn quadrant_move_y(dir: Pos, steps: Pos) -> bool {
 }
 
 fn octant_move_y(dir: Pos, steps: Pos) -> bool {
-	// 0 < dir.x
+	// 0 <= dir.x
 	// 0 <= dir.y <= dir.x
 	// 0 <= steps.x
 	// 0 <= steps.y

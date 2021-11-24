@@ -5,7 +5,8 @@ use serde::Serialize;
 use crate::{
 	Pos,
 	Sprite,
-	PlayerId
+	PlayerId,
+	creature::Health
 };
 
 macro_rules! worldmessages {
@@ -65,7 +66,7 @@ worldmessages!(
 
 
 pub type ChangeMessage = Vec<(Pos, Vec<Sprite>)>;
-pub type HealthMessage = (i64, i64);
+pub type HealthMessage = (Health, Health);
 pub type InventoryMessage = Vec<(String, bool)>;
 pub type GroundMessage = Vec<String>;
 pub type SoundMessage = Vec<(String, String, Option<Value>)>;

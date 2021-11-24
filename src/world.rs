@@ -12,8 +12,8 @@ use crate::{
 	holder::Holder,
 	sprite::Sprite,
 	worldmessages::{WorldMessage, FieldMessage, ChangeMessage},
-	Timestamp,
-	creature::{Creature, Mind, CreatureType, Alignment},
+	timestamp::{Timestamp, Duration},
+	creature::{Creature, Mind, CreatureType, Alignment, Health},
 	tile::Tile,
 	weapon::Bullet,
 	item::Item,
@@ -21,14 +21,15 @@ use crate::{
 	waves::wave_composition,
 	gamemode::GameMode,
 	mapgen::{MapTemplate, MapType, create_map},
-	grid::Grid
+	grid::Grid,
+	pos::Distance
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum RoundState {
 	Running,
-	GameOver(i64),
-	Paused(i64)
+	GameOver(Duration),
+	Paused(Duration)
 }
 
 impl RoundState {	
@@ -191,8 +192,8 @@ impl World {
 		if let Some(target_pos) = target {
 			let range = creature.weapon.get_range();
 			let distance = creature.pos.distance_to(target_pos);
-			if range <= 5 && distance <= range
-					|| distance * 11 <= range * 10 {
+			if range <= Distance(5) && distance <= range
+					|| distance.0 * 11 <= range.0 * 10 {
 				return Some(Control::ShootPrecise(target_pos - creature.pos))
 			}
 		}
@@ -246,28 +247,21 @@ impl World {
 			.collect();
 		self.compute_player_distances();
 		let plans: HashMap<usize, Control> = self.creatures.iter()
-			.filter(|(_k, c)| c.cooldown <= 0)
+			.filter(|(_k, c)| c.cooldown.0 <= 0)
 			.filter_map(|(k, c)|
 				Some((*k, self.creature_plan(c)?))
 			).collect();
 		for (id, creature) in self.creatures.iter_mut() {
-			if creature.health <= 0 {
+			if creature.is_dead() {
 				continue;
 			}
-			let mut new_health = creature.health;
 			if self.ground.get(creature.pos) == Some(&Tile::Sanctuary) {
-				new_health += 2;
+				creature.heal(Health(2));
 			} else if self.round_state.is_paused() {
-				new_health += if creature.is_building {20} else {2};
+				creature.heal(Health(if creature.is_building {20} else {2}));
 			}
-			if new_health > creature.max_health {
-				new_health = creature.max_health;
-			}
-			if new_health > creature.health {
-				creature.health = new_health;
-			}
-			if creature.cooldown > 0 {
-				creature.cooldown -= 1;
+			if creature.cooldown.0 > 0 {
+				creature.cooldown.0 -= 1;
 				continue;
 			}
 			match plans.get(id) {
@@ -280,7 +274,7 @@ impl World {
 								!tile.blocking()
 									|| tile == &Tile::Gate
 										&& self.ground.get(creature.pos) == Some(&Tile::Sanctuary)
-										&& creature.health >= creature.max_health)
+										&& creature.has_full_health())
 								&& !creature_map.contains_key(&newpos) {
 							if creature_map.get(&creature.pos) == Some(id){
 								creature_map.remove(&creature.pos);
@@ -290,7 +284,7 @@ impl World {
 							if let Mind::Player(_) = creature.mind {
 								match self.items.get(&creature.pos) {
 									Some(Item::Health) => {
-										creature.health = creature.max_health;
+										creature.heal(Health(100));
 										self.items.remove(&creature.pos);
 									}
 									None => {}
@@ -327,7 +321,7 @@ impl World {
 					}
 				}
 				Some(Control::Suicide) => {
-					creature.health = -1;
+					creature.kill();
 				}
 				None => {}
 			}
@@ -354,7 +348,7 @@ impl World {
 				if let Some(creatureid) = creature_map.get(&bullet.pos){
 					if let Some(creature) = self.creatures.get_mut(creatureid){
 						if creature.alignment != bullet.alignment {
-							creature.health -= bullet.ammo.damage;
+							creature.damage(bullet.ammo.damage);
 							return None;
 						}
 					}
@@ -390,7 +384,7 @@ impl World {
 		let nmonsters = self.creatures.values().filter(|c| c.alignment == Alignment::Monsters).count();
 		if self.gamemode != GameMode::PvP && nmonsters == 0 && self.to_spawn.is_empty() {
 			self.wave += 1;
-			self.round_state = RoundState::Paused(25);
+			self.round_state = RoundState::Paused(Duration(25));
 			self.to_spawn =
 				wave_composition(self.wave)
 					.into_iter()
@@ -399,10 +393,10 @@ impl World {
 		}
 		if let RoundState::Paused(pause) = self.round_state {
 			
-			self.round_state = if pause <= 0 {
+			self.round_state = if pause.0 <= 0 {
 				RoundState::Running
 			} else {
-				RoundState::Paused(pause - 1)
+				RoundState::Paused(pause - Duration(1))
 			};
 		} else if self.time.0 % 5 == 0 && !self.to_spawn.is_empty() {
 			self.creatures.insert(Creature::create_creature(
@@ -441,7 +435,7 @@ impl World {
 				let mut dead_creatures = Vec::new();
 				let creatureids: Vec<usize> = self.creatures.keys().cloned().collect();
 				for creatureid in creatureids {
-					if self.creatures.get(&creatureid).unwrap().health <= 0 {
+					if self.creatures.get(&creatureid).unwrap().is_dead() {
 						dead_creatures.push(self.creatures.remove(&creatureid).unwrap());
 					}
 				}
@@ -451,9 +445,9 @@ impl World {
 				self.spawn(dead_creatures);
 				
 				if self.is_game_over() {
-					self.round_state = RoundState::GameOver(50);
+					self.round_state = RoundState::GameOver(Duration(50));
 				}
-				self.time.0 += 1;
+				self.time.increment();
 			}
 			
 			
@@ -463,10 +457,10 @@ impl World {
 				for (i, c) in "GAME_OVER!".chars().enumerate() {
 					self.particles.insert(Pos::new(gopos.x + (i as i64), gopos.y), Sprite::letter_sprite(c).unwrap());
 				}
-				if time_left <= 0 {
+				if time_left.0 <= 0 {
 					self.reset();
 				} else {
-					self.round_state = RoundState::GameOver(time_left - 1);
+					self.round_state = RoundState::GameOver(time_left - Duration(1));
 				}
 			}
 		}
@@ -535,9 +529,9 @@ impl World {
 				wm.pos = Some(body.pos);
 				wm.health = Some((body.health, body.max_health));
 			}
-			if self.round_state == RoundState::GameOver(1) {
+			if self.round_state == RoundState::GameOver(Duration(1)) {
 				wm.sounds = Some(vec![("restart".to_string(), "---- Starting new session ----".to_string(), None)]);
-			} else if self.round_state == RoundState::Paused(1) {
+			} else if self.round_state == RoundState::Paused(Duration(1)) {
 				wm.sounds = Some(vec![("wave".to_string(), format!("**** Wave {} *****", self.wave), None)]);
 			}
 			views.insert(playerid.clone(), wm);

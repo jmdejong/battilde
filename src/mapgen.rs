@@ -11,7 +11,8 @@ use crate::{
 	errors::AnyError,
 	aerr,
 	grid::Grid,
-	gamemode::GameMode
+	gamemode::GameMode,
+	pos::Distance
 };
 
 
@@ -100,7 +101,7 @@ fn create_square_map(gamemode: GameMode) -> MapTemplate {
 			for _i in 0..16 {
 				map.ground.set(p, Tile::Obstacle(ObstacleType::Water));
 				p = p + Direction::DIRECTIONS[rand::thread_rng().gen_range(0..4)];
-				if lakepos.distance_to(p) > 4{
+				if lakepos.distance_to(p) > Distance(4){
 					break;
 				}
 			}
