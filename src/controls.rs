@@ -10,7 +10,9 @@ pub enum Control {
 	Move(Direction),
 	Shoot(Option<Direction>),
 	ShootPrecise(Pos),
-	Suicide
+	Suicide,
+	NextWeapon,
+	PreviousWeapon
 }
 
 #[derive(Debug, Clone)]

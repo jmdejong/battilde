@@ -71,6 +71,18 @@ macro_rules! hashmap {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Percentage(pub i64);
 
+pub struct Tuple2;
+
+#[allow(dead_code)]
+impl Tuple2 {
+	pub fn first<T, U>((a, _): &(T, U)) -> &T {
+		a
+	}
+	pub fn second<T, U>((_, b): &(T, U)) -> &U {
+		b
+	}
+}
+
 
 
 #[cfg(test)]

@@ -10,7 +10,8 @@ use crate::{
 	PlayerId,
 	util::Percentage,
 	timestamp::Duration,
-	pos::Distance
+	pos::Distance,
+	util::Tuple2
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,7 +57,9 @@ pub struct Creature {
 	pub walk_cooldown: Duration,
 	pub sprite: Sprite,
 	pub alignment: Alignment,
-	pub weapon: Weapon,
+	pub weapons: Vec<(Weapon, bool)>,
+	pub selected_weapon: usize,
+	weapon: Weapon,
 	pub is_building: bool
 }
 
@@ -86,6 +89,26 @@ impl Creature {
 		self.health.0 -= amount.0;
 	}
 	
+	pub fn weapon(&self) -> Option<&Weapon> {
+		self.weapons.get(self.selected_weapon)
+			.map(Tuple2::first)
+	}
+	
+	pub fn select_next_weapon(&mut self) {
+		self.selected_weapon = self.selected_weapon.min(self.weapons.len() - 1);
+		let mut indices = (self.selected_weapon+1..self.weapons.len()).chain(0..=self.selected_weapon);
+		self.selected_weapon = indices.find(|index| self.weapons[*index].1).unwrap_or(0)
+	}
+	pub fn select_previous_weapon(&mut self) {
+		self.selected_weapon = self.selected_weapon.min(self.weapons.len() - 1);
+		let mut indices = (0..self.selected_weapon).rev().chain((self.selected_weapon..self.weapons.len()).rev());
+		self.selected_weapon = indices.find(|index| self.weapons[*index].1).unwrap_or(0)
+	}
+	
+	pub fn range(&self) -> Distance {
+		self.weapon().map(Weapon::get_range).unwrap_or(Distance(0))
+	}
+	
 	pub fn create_creature(typ: CreatureType, pos: Pos) -> Self{
 		match typ {
 			CreatureType::Player => Self::new_player(PlayerId("".to_string()), Sprite("player_g:X"), pos, true), // will probably commite suicide immediately
@@ -110,6 +133,8 @@ impl Creature {
 			walk_cooldown: Duration(1),
 			sprite: Sprite("pillar"),
 			weapon: Weapon::none(),
+			weapons: vec![],
+			selected_weapon: 0,
 			alignment: Alignment::Players,
 			is_building: true
 		}
@@ -127,6 +152,14 @@ impl Creature {
 			walk_cooldown: Duration(0),
 			sprite,
 			weapon: Weapon::rifle(),
+			weapons: vec![
+				(Weapon::rifle(), true),
+				(Weapon::smg(), true),
+				(Weapon::none(), false),
+				(Weapon::smg(), true),
+				(Weapon::rifle(), true)
+			],
+			selected_weapon: 0,
 			alignment: 
 				if pvp {
 					Alignment::Player(playerid)
@@ -213,7 +246,9 @@ impl Creature {
 			cooldown: Duration(thread_rng().gen_range(0..=cooldown.0)),
 			walk_cooldown: cooldown,
 			sprite,
-			weapon,
+			weapon: weapon.clone(),
+			weapons: vec![(weapon, true)],
+			selected_weapon: 0,
 			alignment: Alignment::Monsters,
 			is_building: false
 		}

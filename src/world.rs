@@ -190,7 +190,7 @@ impl World {
 			}
 		}
 		if let Some(target_pos) = target {
-			let range = creature.weapon.get_range();
+			let range = creature.range();
 			let distance = creature.pos.distance_to(target_pos);
 			if range <= Distance(5) && distance <= range
 					|| distance.0 * 11 <= range.0 * 10 {
@@ -294,40 +294,49 @@ impl World {
 					}
 				}
 				Some(Control::Shoot(dir)) => {
-					creature.cooldown = creature.weapon.get_cooldown();
 					if let Some(direction) = dir {
 						creature.dir = *direction;
 					}
-					if !self.ground.get(creature.pos).unwrap().blocking(){
-						self.bullets.append(
-							&mut creature.weapon.shoot(
-								creature.pos,
-								creature.dir.to_position(),
-								creature.alignment.clone()
-							)
-						);
-					}
+					creature.cooldown = if let Some(weapon) = creature.weapon() {
+						if !self.ground.get(creature.pos).unwrap().blocking(){
+							self.bullets.append(
+								&mut weapon.shoot(
+									creature.pos,
+									creature.dir.to_position(),
+									creature.alignment.clone()
+								)
+							);
+						}
+						weapon.get_cooldown()
+					} else { Duration(0) }
 				}
 				Some(Control::ShootPrecise(dirvec)) => {
-					creature.cooldown = creature.weapon.get_cooldown();
-					if !self.ground.get(creature.pos).unwrap().blocking(){
-						self.bullets.append(
-							&mut creature.weapon.shoot(
-								creature.pos,
-								*dirvec,
-								creature.alignment.clone()
-							)
-						);
-					}
+					creature.cooldown = if let Some(weapon) = creature.weapon() {
+						if !self.ground.get(creature.pos).unwrap().blocking(){
+							self.bullets.append(
+								&mut weapon.shoot(
+									creature.pos,
+									*dirvec,
+									creature.alignment.clone()
+								)
+							);
+						}
+						weapon.get_cooldown()
+					} else { Duration(0) }
 				}
 				Some(Control::Suicide) => {
 					creature.kill();
+				}
+				Some(Control::NextWeapon) => {
+					creature.select_next_weapon();
+				}
+				Some(Control::PreviousWeapon) => {
+					creature.select_previous_weapon();
 				}
 				None => {}
 			}
 		}
 	}
-	
 	
 	fn update_bullets(&mut self) {
 		let creature_map: HashMap<Pos, usize> = self.creatures.iter()
@@ -528,11 +537,18 @@ impl World {
 			if let Some(body) = self.creatures.get(&player.body){
 				wm.pos = Some(body.pos);
 				wm.health = Some((body.health, body.max_health));
+				wm.weapons = Some((
+					body.weapons.iter()
+						.filter(|(_, unlocked)| *unlocked)
+						.map(|(weapon, _)| weapon.name)
+						.collect::<Vec<&'static str>>(),
+					body.weapons[0..body.selected_weapon].iter().filter(|(_, unlocked)| *unlocked).count()
+				))
 			}
 			if self.round_state == RoundState::GameOver(Duration(1)) {
 				wm.sounds = Some(vec![("restart".to_string(), "---- Starting new session ----".to_string(), None)]);
 			} else if self.round_state == RoundState::Paused(Duration(1)) {
-				wm.sounds = Some(vec![("wave".to_string(), format!("**** Wave {} *****", self.wave), None)]);
+				wm.sounds = Some(vec![("wave".to_string(), format!("**** Wave {} ****", self.wave), None)]);
 			}
 			views.insert(playerid.clone(), wm);
 		}

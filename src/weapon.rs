@@ -16,7 +16,8 @@ pub struct Weapon {
 	cooldown: Duration,
 	ammo: Ammo,
 	nbullets: i64,
-	spread: Percentage
+	spread: Percentage,
+	pub name: &'static str
 }
 
 impl Weapon {
@@ -48,6 +49,9 @@ impl Weapon {
 	pub fn bite(damage: Health, cooldown: Duration) -> Self {
 		Weapon {
 			cooldown,
+			nbullets: 1,
+			spread: Percentage(0),
+			name: "Bite",
 			ammo: Ammo {
 				damage,
 				range: Distance(1),
@@ -55,8 +59,6 @@ impl Weapon {
 				sprites: vec![Sprite("bite")],
 				spreading: false
 			},
-			nbullets: 1,
-			spread: Percentage(0)
 		}
 	}
 	
@@ -65,6 +67,7 @@ impl Weapon {
 			cooldown,
 			nbullets: 1,
 			spread,
+			name: "Cast",
 			ammo: Ammo {
 				damage,
 				range,
@@ -80,6 +83,7 @@ impl Weapon {
 			cooldown: Duration(0),
 			nbullets: 1,
 			spread: Percentage(0),
+			name: "SMG",
 			ammo: Ammo {
 				damage: Health(10),
 				range: Distance(28),
@@ -96,6 +100,7 @@ impl Weapon {
 			cooldown: Duration(2),
 			nbullets: 1,
 			spread: Percentage(0),
+			name: "Rifle",
 			ammo: Ammo {
 				damage: Health(25),
 				range: Distance(32),
@@ -107,11 +112,12 @@ impl Weapon {
 	
 	}
 	
-	pub fn none() -> Self {
+	pub const fn none() -> Self {
 		Weapon {
 			cooldown: Duration(0),
 			nbullets: 0,
 			spread: Percentage(0),
+			name: "Nothing",
 			ammo: Ammo {
 				damage: Health(0),
 				range: Distance(0),
