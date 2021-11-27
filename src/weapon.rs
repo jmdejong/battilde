@@ -23,19 +23,23 @@ pub struct Weapon {
 impl Weapon {
 
 	
-	pub fn shoot(&self, pos: Pos, mut direction: Pos, alignment: Alignment) -> Vec<Bullet> {
-		if self.spread.0 != 0 {
-			let mut rng = thread_rng();
-			let deviation = self.spread.0 * direction.size().0;
-			direction = direction * 100 + Pos::new(rng.gen_range(-deviation..=deviation), rng.gen_range(-deviation..=deviation));
-		}
-		vec![Bullet {
-			direction,
-			pos,
-			alignment: alignment,
-			ammo: self.ammo.clone(),
-			steps: Pos::new(0, 0)
-		}]
+	pub fn shoot(&self, pos: Pos, direction: Pos, alignment: Alignment) -> Vec<Bullet> {
+		let mut rng = thread_rng();
+		let deviation = self.spread.0 * direction.size().0;
+		(0..self.nbullets)
+			.map(|_| {
+				let dir = if self.spread.0 != 0 {
+					direction * 100 + Pos::new(rng.gen_range(-deviation..=deviation), rng.gen_range(-deviation..=deviation))
+				} else {direction};
+				Bullet {
+					direction: dir,
+					pos,
+					alignment: alignment.clone(),
+					ammo: self.ammo.clone(),
+					steps: Pos::new(0, 0)
+				}
+			})
+			.collect::<Vec<Bullet>>()
 	}
 	
 	pub fn get_range(&self) -> Distance {
@@ -86,7 +90,7 @@ impl Weapon {
 			name: "SMG",
 			ammo: Ammo {
 				damage: Health(10),
-				range: Distance(28),
+				range: Distance(24),
 				speed: 3,
 				sprites: vec![Sprite::new("bulletvert"), Sprite::new("bullethor")],
 				spreading: true
@@ -95,21 +99,35 @@ impl Weapon {
 	}
 	
 	pub fn rifle() -> Self {
-	
 		Weapon {
-			cooldown: Duration(2),
+			cooldown: Duration(4),
 			nbullets: 1,
 			spread: Percentage(0),
 			name: "Rifle",
 			ammo: Ammo {
 				damage: Health(25),
-				range: Distance(32),
+				range: Distance(40),
 				speed: 4,
 				sprites: vec![Sprite::new("bulletvert"), Sprite::new("bullethor")],
 				spreading: false
 			}
 		}
+	}
 	
+	pub fn shotgun() -> Self {
+		Weapon {
+			cooldown: Duration(5),
+			nbullets: 20,
+			spread: Percentage(45),
+			name: "Shotgun",
+			ammo: Ammo {
+				damage: Health(5),
+				range: Distance(14),
+				speed: 5,
+				sprites: vec![Sprite::new("bulletvert"), Sprite::new("bullethor")],
+				spreading: false
+			}
+		}
 	}
 	
 	pub const fn none() -> Self {

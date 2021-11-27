@@ -539,10 +539,9 @@ impl World {
 				wm.health = Some((body.health, body.max_health));
 				wm.weapons = Some((
 					body.weapons.iter()
-						.filter(|(_, unlocked)| *unlocked)
-						.map(|(weapon, _)| weapon.name)
+						.map(|weapon| weapon.name)
 						.collect::<Vec<&'static str>>(),
-					body.weapons[0..body.selected_weapon].iter().filter(|(_, unlocked)| *unlocked).count()
+					body.selected_weapon
 				))
 			}
 			if self.round_state == RoundState::GameOver(Duration(1)) {

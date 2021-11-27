@@ -10,8 +10,7 @@ use crate::{
 	PlayerId,
 	util::Percentage,
 	timestamp::Duration,
-	pos::Distance,
-	util::Tuple2
+	pos::Distance
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,9 +56,8 @@ pub struct Creature {
 	pub walk_cooldown: Duration,
 	pub sprite: Sprite,
 	pub alignment: Alignment,
-	pub weapons: Vec<(Weapon, bool)>,
+	pub weapons: Vec<Weapon>,
 	pub selected_weapon: usize,
-	weapon: Weapon,
 	pub is_building: bool
 }
 
@@ -91,18 +89,13 @@ impl Creature {
 	
 	pub fn weapon(&self) -> Option<&Weapon> {
 		self.weapons.get(self.selected_weapon)
-			.map(Tuple2::first)
 	}
 	
 	pub fn select_next_weapon(&mut self) {
-		self.selected_weapon = self.selected_weapon.min(self.weapons.len() - 1);
-		let mut indices = (self.selected_weapon+1..self.weapons.len()).chain(0..=self.selected_weapon);
-		self.selected_weapon = indices.find(|index| self.weapons[*index].1).unwrap_or(0)
+		self.selected_weapon = (self.selected_weapon + 1 ) % self.weapons.len();
 	}
 	pub fn select_previous_weapon(&mut self) {
-		self.selected_weapon = self.selected_weapon.min(self.weapons.len() - 1);
-		let mut indices = (0..self.selected_weapon).rev().chain((self.selected_weapon..self.weapons.len()).rev());
-		self.selected_weapon = indices.find(|index| self.weapons[*index].1).unwrap_or(0)
+		self.selected_weapon = (self.selected_weapon - 1).min(self.weapons.len() - 1);
 	}
 	
 	pub fn range(&self) -> Distance {
@@ -120,26 +113,7 @@ impl Creature {
 			CreatureType::Xiangliu => Self::new_xiangliu(pos),
 			CreatureType::Vargr => Self::new_vargr(pos)
 		}
-	}	
-	
-	pub fn new_pillar(pos: Pos) -> Self {
-		Self {
-			mind: Mind::Pillar,
-			pos,
-			dir: Direction::North,
-			health: Health(200),
-			max_health: Health(200),
-			cooldown: Duration(1),
-			walk_cooldown: Duration(1),
-			sprite: Sprite::new("pillar"),
-			weapon: Weapon::none(),
-			weapons: vec![],
-			selected_weapon: 0,
-			alignment: Alignment::Players,
-			is_building: true
-		}
 	}
-	
 	
 	pub fn new_player(playerid: PlayerId, sprite: Sprite, pos: Pos, pvp: bool) -> Self {
 		Self {
@@ -151,13 +125,10 @@ impl Creature {
 			cooldown: Duration(0),
 			walk_cooldown: Duration(0),
 			sprite,
-			weapon: Weapon::rifle(),
 			weapons: vec![
-				(Weapon::rifle(), true),
-				(Weapon::smg(), true),
-				(Weapon::none(), false),
-				(Weapon::smg(), true),
-				(Weapon::rifle(), true)
+				Weapon::shotgun(),
+				Weapon::rifle(),
+				Weapon::smg(),
 			],
 			selected_weapon: 0,
 			alignment: 
@@ -167,6 +138,23 @@ impl Creature {
 					Alignment::Players
 				},
 			is_building: false
+		}
+	}
+	
+	pub fn new_pillar(pos: Pos) -> Self {
+		Self {
+			mind: Mind::Pillar,
+			pos,
+			dir: Direction::North,
+			health: Health(200),
+			max_health: Health(200),
+			cooldown: Duration(1),
+			walk_cooldown: Duration(1),
+			sprite: Sprite::new("pillar"),
+			weapons: vec![],
+			selected_weapon: 0,
+			alignment: Alignment::Players,
+			is_building: true
 		}
 	}
 	
@@ -246,8 +234,7 @@ impl Creature {
 			cooldown: Duration(thread_rng().gen_range(0..=cooldown.0)),
 			walk_cooldown: cooldown,
 			sprite,
-			weapon: weapon.clone(),
-			weapons: vec![(weapon, true)],
+			weapons: vec![weapon],
 			selected_weapon: 0,
 			alignment: Alignment::Monsters,
 			is_building: false
