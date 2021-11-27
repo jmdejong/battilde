@@ -2,6 +2,9 @@
 
 use std::fmt;
 use serde::{Serialize, Deserialize};
+use battilde_macros::generate_player_sprites;
+
+mod player_sprites;
 
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize, Deserialize)]
 pub struct Sprite(pub &'static str);
@@ -19,12 +22,13 @@ macro_rules! makesprites {
 }
 
 impl Sprite {
-	pub const PLAYER_SPRITES: &'static [Sprite] = 
-		makeplayersprites!(old (r g b c m y lr lg lb lc lm ly a); () (A B C D E F G H I J K L M N O P Q R S T U V W X Y Z); []);
+	pub const PLAYER_SPRITES: &'static [Sprite] = generate_player_sprites!();
+// 		player_sprites::PLAYER_SPRITES;
+// 		makeplayersprites!(old (r g b c m y lr lg lb lc lm ly a); () (A B C D E F G H I J K L M N O P Q R S T U V W X Y Z); []);
 	pub const LETTERS: &'static [Sprite] = makesprites!("emptyletter-", A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ~ ! @ # $ % ^ & * ( ) _ + - =);
 	
 	pub fn player_sprite(spritename: &str) -> Option<Sprite> {
-		Sprite::PLAYER_SPRITES.iter().find(|s|s.0 == spritename).cloned()
+		Sprite::PLAYER_SPRITES.iter().find(|s|s.0.to_lowercase() == spritename.to_lowercase()).cloned()
 	}
 	
 	pub fn letter_sprite(letter: char) -> Option<Sprite> {
@@ -32,7 +36,6 @@ impl Sprite {
 		Sprite::LETTERS.iter().find(|s|s.0 == spritename).cloned()
 	}
 }
-
 
 impl fmt::Display for Sprite {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
