@@ -16,7 +16,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Mind {
 	Player(PlayerId),
-	Zombie,
+	BloodThirst(Percentage),
 	Destroyer,
 	Pillar,
 }
@@ -161,7 +161,7 @@ impl Creature {
 	pub fn new_zombie(pos: Pos) -> Self {
 		Self::new_monster(
 			pos,
-			Mind::Zombie,
+			Mind::BloodThirst(Percentage(0)),
 			Health(20),
 			Duration(2),
 			Sprite::new("zombie"),
@@ -172,11 +172,11 @@ impl Creature {
 	pub fn new_ymp(pos: Pos) -> Self {
 		Self::new_monster(
 			pos,
-			Mind::Zombie,
+			Mind::BloodThirst(Percentage(0)),
 			Health(20),
 			Duration(2),
 			Sprite::new("ymp"),
-			Weapon::cast(Health(10), Distance(30), Percentage(0), Duration(2))
+			Weapon::cast(Health(10), Distance(30), Duration(2))
 		)
 	}
 	
@@ -187,7 +187,7 @@ impl Creature {
 			Health(100),
 			Duration(4),
 			Sprite::new("troll"),
-			Weapon::cast(Health(50), Distance(2), Percentage(0), Duration(4))
+			Weapon::cast(Health(50), Distance(2), Duration(4))
 		)
 	}
 	
@@ -198,29 +198,29 @@ impl Creature {
 			Health(12),
 			Duration(3),
 			Sprite::new("worm"),
-			Weapon::cast(Health(10), Distance(2), Percentage(0), Duration(3))
+			Weapon::cast(Health(10), Distance(2), Duration(3))
 		)
 	}
 	
 	fn new_xiangliu(pos: Pos) -> Self {
 		Self::new_monster(
 			pos,
-			Mind::Zombie,
+			Mind::BloodThirst(Percentage(0)),
 			Health(50),
-			Duration(2),
+			Duration(1),
 			Sprite::new("xiangliu"),
-			Weapon::cast(Health(10), Distance(16), Percentage(30), Duration(0))
+			Weapon::spit(Health(10), Distance(16), 9, Percentage(60), Duration(4))
 		)
 	}
 	
 	fn new_vargr(pos: Pos) -> Self {
 		Self::new_monster(
 			pos,
-			Mind::Zombie,
-			Health(30),
-			Duration(1),
+			Mind::BloodThirst(Percentage(20)),
+			Health(50),
+			Duration(0),
 			Sprite::new("vargr"),
-			Weapon::bite(Health(20), Duration(3))
+			Weapon::bite(Health(30), Duration(10))
 		)
 	}
 	

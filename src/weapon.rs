@@ -15,7 +15,7 @@ use crate::{
 pub struct Weapon {
 	cooldown: Duration,
 	ammo: Ammo,
-	nbullets: i64,
+	nbullets: usize,
 	spread: Percentage,
 	pub name: &'static str
 }
@@ -66,17 +66,33 @@ impl Weapon {
 		}
 	}
 	
-	pub fn cast(damage: Health, range: Distance, spread: Percentage, cooldown: Duration) -> Self {
+	pub fn cast(damage: Health, range: Distance, cooldown: Duration) -> Self {
 		Weapon {
 			cooldown,
 			nbullets: 1,
-			spread,
+			spread: Percentage(0),
 			name: "Cast",
 			ammo: Ammo {
 				damage,
 				range,
 				speed: 1,
 				sprites: vec![Sprite::new("bullet")],
+				spreading: false
+			}
+		}
+	}
+	
+	pub fn spit(damage: Health, range: Distance, nbullets: usize, spread: Percentage, cooldown: Duration) -> Self {
+		Weapon {
+			cooldown,
+			nbullets,
+			spread,
+			name: "Spit",
+			ammo: Ammo {
+				damage,
+				range,
+				speed: 1,
+				sprites: vec![Sprite::new("spit")],
 				spreading: false
 			}
 		}
@@ -125,22 +141,6 @@ impl Weapon {
 				range: Distance(14),
 				speed: 5,
 				sprites: vec![Sprite::new("bulletvert"), Sprite::new("bullethor")],
-				spreading: false
-			}
-		}
-	}
-	
-	pub const fn none() -> Self {
-		Weapon {
-			cooldown: Duration(0),
-			nbullets: 0,
-			spread: Percentage(0),
-			name: "Nothing",
-			ammo: Ammo {
-				damage: Health(0),
-				range: Distance(0),
-				speed: 1,
-				sprites: vec![],
 				spreading: false
 			}
 		}

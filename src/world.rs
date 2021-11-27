@@ -22,7 +22,8 @@ use crate::{
 	gamemode::GameMode,
 	mapgen::{MapTemplate, MapType, create_map},
 	grid::Grid,
-	pos::Distance
+	pos::Distance,
+	util::Percentage
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -174,7 +175,7 @@ impl World {
 		known
 	}
 	
-	fn monster_plan<F>(&self, creature: &Creature, distance_map: &Grid<Option<usize>>, is_target: F) -> Option<Control>
+	fn monster_plan<F>(&self, creature: &Creature, distance_map: &Grid<Option<usize>>, is_target: F, deviation: &Percentage) -> Option<Control>
 			where F: Fn(&Creature) -> bool {
 		// find nearest attackable target
 		let mut target = None;
@@ -197,18 +198,23 @@ impl World {
 				return Some(Control::ShootPrecise(target_pos - creature.pos))
 			}
 		}
-		let mut dirs: Vec<Direction> = Direction::DIRECTIONS.to_vec();
-		dirs.shuffle(&mut thread_rng());
-		dirs.sort_by_key(|dir| distance_map.get(creature.pos + *dir).unwrap_or(&None).unwrap_or(std::usize::MAX));
-		for dir in dirs{
-			let newpos = creature.pos + dir;
-			if let Some(tile) = self.ground.get(newpos) {
-				if !tile.blocking() {
-					return Some(Control::Move(dir));
+		let mut dirs: Vec<Direction> = Direction::DIRECTIONS.iter()
+			.filter_map(|dir| {
+				let newpos = creature.pos + *dir;
+				if let Some(tile) = self.ground.get(newpos) {
+					if !tile.blocking() {
+						return Some(*dir);
+					}
 				}
-			}
+				None
+			})
+			.collect();
+		let mut rng = thread_rng();
+		dirs.shuffle(&mut rng);
+		if rng.gen_range(0..100) >= deviation.0 {
+			dirs.sort_by_key(|dir| distance_map.get(creature.pos + *dir).unwrap_or(&None).unwrap_or(std::usize::MAX));
 		}
-		None
+		Some(Control::Move(*dirs.first()?))
 	}
 	
 	fn creature_plan(&self, creature: &Creature) -> Option<Control> {
@@ -218,14 +224,15 @@ impl World {
 					player.plan.clone()
 				} else {Some(Control::Suicide)}
 			}
-			Mind::Zombie => {
+			Mind::BloodThirst(deviation) => {
 				self.monster_plan(
 					creature,
 					&self.player_distances,
 					|player| 
 						player.alignment != creature.alignment 
 						&& !player.is_building 
-						&& self.ground.get(player.pos) != Some(&Tile::Sanctuary)
+						&& self.ground.get(player.pos) != Some(&Tile::Sanctuary),
+					deviation
 				)
 			}
 			Mind::Destroyer => {
@@ -234,7 +241,8 @@ impl World {
 					&self.building_distances,
 					|player| 
 						player.alignment != creature.alignment 
-						&& player.is_building
+						&& player.is_building,
+					&Percentage(0)
 				)
 			}
 			Mind::Pillar => None
