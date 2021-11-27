@@ -105,7 +105,7 @@ impl Weapon {
 			spread: Percentage(0),
 			name: "SMG",
 			ammo: Ammo {
-				damage: Health(10),
+				damage: Health(8),
 				range: Distance(24),
 				speed: 3,
 				sprites: vec![Sprite::new("bulletvert"), Sprite::new("bullethor")],
@@ -140,7 +140,7 @@ impl Weapon {
 				damage: Health(5),
 				range: Distance(14),
 				speed: 5,
-				sprites: vec![Sprite::new("bulletvert"), Sprite::new("bullethor")],
+				sprites: vec![Sprite::new("hail")],
 				spreading: false
 			}
 		}

@@ -173,7 +173,7 @@ impl Creature {
 		Self::new_monster(
 			pos,
 			Mind::BloodThirst(Percentage(0)),
-			Health(20),
+			Health(25),
 			Duration(2),
 			Sprite::new("ymp"),
 			Weapon::cast(Health(10), Distance(30), Duration(2))
