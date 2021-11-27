@@ -111,7 +111,7 @@ impl Creature {
 	
 	pub fn create_creature(typ: CreatureType, pos: Pos) -> Self{
 		match typ {
-			CreatureType::Player => Self::new_player(PlayerId("".to_string()), Sprite("player_g:X"), pos, true), // will probably commite suicide immediately
+			CreatureType::Player => Self::new_player(PlayerId("".to_string()), Sprite::new("player_g:X"), pos, true), // will probably commite suicide immediately
 			CreatureType::Zombie => Self::new_zombie(pos),
 			CreatureType::Ymp => Self::new_ymp(pos),
 			CreatureType::Worm => Self::new_worm(pos),
@@ -131,7 +131,7 @@ impl Creature {
 			max_health: Health(200),
 			cooldown: Duration(1),
 			walk_cooldown: Duration(1),
-			sprite: Sprite("pillar"),
+			sprite: Sprite::new("pillar"),
 			weapon: Weapon::none(),
 			weapons: vec![],
 			selected_weapon: 0,
@@ -176,7 +176,7 @@ impl Creature {
 			Mind::Zombie,
 			Health(20),
 			Duration(2),
-			Sprite("zombie"),
+			Sprite::new("zombie"),
 			Weapon::bite(Health(10), Duration(2))
 		)
 	}
@@ -187,7 +187,7 @@ impl Creature {
 			Mind::Zombie,
 			Health(20),
 			Duration(2),
-			Sprite("ymp"),
+			Sprite::new("ymp"),
 			Weapon::cast(Health(10), Distance(30), Percentage(0), Duration(2))
 		)
 	}
@@ -198,7 +198,7 @@ impl Creature {
 			Mind::Destroyer,
 			Health(100),
 			Duration(4),
-			Sprite("troll"),
+			Sprite::new("troll"),
 			Weapon::cast(Health(50), Distance(2), Percentage(0), Duration(4))
 		)
 	}
@@ -209,7 +209,7 @@ impl Creature {
 			Mind::Destroyer,
 			Health(12),
 			Duration(3),
-			Sprite("worm"),
+			Sprite::new("worm"),
 			Weapon::cast(Health(10), Distance(2), Percentage(0), Duration(3))
 		)
 	}
@@ -220,7 +220,7 @@ impl Creature {
 			Mind::Zombie,
 			Health(50),
 			Duration(2),
-			Sprite("xiangliu"),
+			Sprite::new("xiangliu"),
 			Weapon::cast(Health(10), Distance(16), Percentage(30), Duration(0))
 		)
 	}
@@ -231,7 +231,7 @@ impl Creature {
 			Mind::Zombie,
 			Health(30),
 			Duration(1),
-			Sprite("vargr"),
+			Sprite::new("vargr"),
 			Weapon::bite(Health(20), Duration(3))
 		)
 	}

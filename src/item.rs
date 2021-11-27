@@ -8,7 +8,7 @@ pub enum Item {
 
 impl Item {
 	pub fn sprite(&self) -> Sprite {
-		Sprite(match self {
+		Sprite::new(match self {
 			Self::Health => "health"
 		})
 	}

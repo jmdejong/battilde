@@ -1,32 +1,85 @@
 
 
 use std::fmt;
-use serde::{Serialize, Deserialize};
-use battilde_macros::generate_player_sprites;
+use serde::{Serialize, Serializer};
 
-#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize, Deserialize)]
-pub struct Sprite(pub &'static str);
-
-macro_rules! makesprites {
-	($prefix: expr, $($letter: tt)*) => {&[$(Sprite(concat!($prefix, stringify!($letter)))),*]};
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
+pub enum Sprite {
+	Custom(&'static str),
+	Letter(char),
+	Player(&'static str, char)
 }
 
+const VALID_COLOURS: &'static[&'static str] = &["r", "g", "b", "c", "m", "y", "lr", "lg", "lb", "lc", "lm", "ly", "a"];
+
 impl Sprite {
-	pub const PLAYER_SPRITES: &'static [Sprite] = generate_player_sprites!();
-	pub const LETTERS: &'static [Sprite] = makesprites!("emptyletter-", A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ~ ! @ # $ % ^ & * ( ) _ + - =);
+	
+	pub const fn new(name: &'static str) -> Self {
+		Self::Custom(name)
+	}
 	
 	pub fn player_sprite(spritename: &str) -> Option<Sprite> {
-		Sprite::PLAYER_SPRITES.iter().find(|s|s.0.to_lowercase() == spritename.to_lowercase()).cloned()
+		let lowername = spritename.to_lowercase();
+		let (colour_name, letter_str) = lowername.strip_prefix("player_")?.split_once("-")?;
+		let letter: char = letter_str.chars().next()?;
+		let colour = VALID_COLOURS.iter().find(|colour| *colour == &colour_name)?;
+		if letter_str.len() == 1 && letter.is_ascii_alphabetic() {
+			Some(Self::Player(colour, letter))
+		} else {
+			None
+		}
 	}
 	
 	pub fn letter_sprite(letter: char) -> Option<Sprite> {
-		let spritename = format!("emptyletter-{}", letter);
-		Sprite::LETTERS.iter().find(|s|s.0 == spritename).cloned()
+		if letter.is_ascii_graphic() {
+			Some(Self::Letter(letter))
+		} else {
+			None
+		}
 	}
 }
 
+
+
+
 impl fmt::Display for Sprite {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "{}", self.0)
+		match self {
+			Sprite::Custom(name) => write!(f, "{}", name),
+			Sprite::Letter(letter) => write!(f, "emptyletter-{}", letter),
+			Sprite::Player(colour, letter) => write!(f, "player_{}-{}", colour, letter)
+		}
+	}
+}
+
+
+
+impl Serialize for Sprite {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where S: Serializer {
+		format!("{}", self).serialize(serializer)
+	}
+}
+
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	
+	#[test]
+	fn test_player_sprite_creation() {
+		assert_eq!(Sprite::player_sprite("player_lg-a"), Some(Sprite::Player("lg", 'a')));
+	}
+	#[test]
+	fn test_player_sprite_display() {
+		assert_eq!(format!("{}", Sprite::Player("lg", 'a')), "player_lg-a".to_string());
+	}
+	#[test]
+	fn test_letter_sprite_creation() {
+		assert_eq!(Sprite::letter_sprite('A'), Some(Sprite::Letter('A')));
+	}
+	#[test]
+	fn test_letter_sprite_display() {
+		assert_eq!(format!("{}", Sprite::Letter('A')), "emptyletter-A".to_string());
 	}
 }

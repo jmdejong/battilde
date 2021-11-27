@@ -36,7 +36,7 @@ pub enum Tile {
 
 impl Tile {
 	pub fn sprite(&self) -> Sprite{
-		Sprite(match self {
+		Sprite::new(match self {
 			Tile::Floor(FloorType::Stone) => "floor",
 			Tile::Floor(FloorType::Dirt) => "ground",
 			Tile::Floor(FloorType::Grass1) => "grass1",

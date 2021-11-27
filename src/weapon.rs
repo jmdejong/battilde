@@ -56,7 +56,7 @@ impl Weapon {
 				damage,
 				range: Distance(1),
 				speed: 2,
-				sprites: vec![Sprite("bite")],
+				sprites: vec![Sprite::new("bite")],
 				spreading: false
 			},
 		}
@@ -72,7 +72,7 @@ impl Weapon {
 				damage,
 				range,
 				speed: 1,
-				sprites: vec![Sprite("bullet")],
+				sprites: vec![Sprite::new("bullet")],
 				spreading: false
 			}
 		}
@@ -88,7 +88,7 @@ impl Weapon {
 				damage: Health(10),
 				range: Distance(28),
 				speed: 3,
-				sprites: vec![Sprite("bulletvert"), Sprite("bullethor")],
+				sprites: vec![Sprite::new("bulletvert"), Sprite::new("bullethor")],
 				spreading: true
 			}
 		}
@@ -105,7 +105,7 @@ impl Weapon {
 				damage: Health(25),
 				range: Distance(32),
 				speed: 4,
-				sprites: vec![Sprite("bulletvert"), Sprite("bullethor")],
+				sprites: vec![Sprite::new("bulletvert"), Sprite::new("bullethor")],
 				spreading: false
 			}
 		}

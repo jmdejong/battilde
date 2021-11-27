@@ -40,7 +40,7 @@ if inet:
 	sock.connect(("localhost", 9021))
 else:
 	sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-	sock.connect("\0rustifarm")
+	sock.connect("\0battilde")
 
 def listen():
 	while True:
@@ -58,7 +58,7 @@ else:
 	name = getpass.getuser()
 print(name)
 
-send(sock, bytes(json.dumps(["auth", {"name": name, "join": join, "type": "guest"}]), "utf-8"))
+send(sock, bytes(json.dumps({"introduction": [name, "player_lg-a"]}), "utf-8"))
 
 for line in sys.stdin:
 	send(sock, bytes(json.dumps(["chat", line.strip()]), "utf-8"))
