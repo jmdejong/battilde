@@ -30,7 +30,8 @@ pub enum CreatureType {
 	Pillar,
 	Player,
 	Vargr,
-	Xiangliu
+	Xiangliu,
+	Wasp
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -111,7 +112,8 @@ impl Creature {
 			CreatureType::Troll => Self::new_troll(pos),
 			CreatureType::Pillar => Self::new_pillar(pos),
 			CreatureType::Xiangliu => Self::new_xiangliu(pos),
-			CreatureType::Vargr => Self::new_vargr(pos)
+			CreatureType::Vargr => Self::new_vargr(pos),
+			CreatureType::Wasp => Self::new_wasp(pos)
 		}
 	}
 	
@@ -206,21 +208,32 @@ impl Creature {
 		Self::new_monster(
 			pos,
 			Mind::BloodThirst(Percentage(0)),
-			Health(50),
-			Duration(1),
+			Health(100),
+			Duration(2),
 			Sprite::new("xiangliu"),
-			Weapon::spit(Health(10), Distance(16), 9, Percentage(60), Duration(4))
+			Weapon::spit(Health(20), Distance(16), 9, Percentage(60), Duration(8))
 		)
 	}
 	
 	fn new_vargr(pos: Pos) -> Self {
 		Self::new_monster(
 			pos,
-			Mind::BloodThirst(Percentage(20)),
+			Mind::BloodThirst(Percentage(15)),
 			Health(50),
 			Duration(0),
 			Sprite::new("vargr"),
 			Weapon::bite(Health(30), Duration(10))
+		)
+	}
+	
+	fn new_wasp(pos: Pos) -> Self {
+		Self::new_monster(
+			pos,
+			Mind::BloodThirst(Percentage(30)),
+			Health(4),
+			Duration(0),
+			Sprite::new("wasp"),
+			Weapon::bite(Health(6), Duration(3))
 		)
 	}
 	

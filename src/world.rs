@@ -435,7 +435,7 @@ impl World {
 		if self.gamemode == GameMode::Survival {
 			match stored {
 				CreatureType::Worm => vec![CreatureType::Zombie, CreatureType::Zombie, CreatureType::Zombie],
-				CreatureType::Troll => vec![CreatureType::Ymp, CreatureType::Ymp, CreatureType::Zombie],
+				CreatureType::Troll => vec![CreatureType::Ymp, CreatureType::Zombie, CreatureType::Zombie],
 				other => vec![other]
 			}
 		} else {
