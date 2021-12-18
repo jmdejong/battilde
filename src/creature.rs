@@ -96,7 +96,7 @@ impl Creature {
 		self.selected_weapon = (self.selected_weapon + 1 ) % self.weapons.len();
 	}
 	pub fn select_previous_weapon(&mut self) {
-		self.selected_weapon = (self.selected_weapon - 1).min(self.weapons.len() - 1);
+		self.selected_weapon = (self.selected_weapon + self.weapons.len() - 1) % self.weapons.len();
 	}
 	
 	pub fn range(&self) -> Distance {
