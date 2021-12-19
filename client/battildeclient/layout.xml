@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<hbox>
+    <vbox width="24" align="right">
+        <textbox id="healthtitle" height="1" format="true">Health ({filled}/{total})</textbox>
+        <bar id="health" height="1" full-char="#" empty-char="_" full-style="fg:2; bg:2" empty-style="fg:1; bg: 1;"></bar>
+        <vbox height="10" key="inventory">
+            <textbox height="1">Inventory:</textbox>
+            <listing id="inventory">
+                SMG
+            </listing>
+        </vbox>
+        <textbox id="info" wrap="words"></textbox>
+    </vbox>
+    <vbox>
+        <textinput id="textinput" align="bottom" height="1">hello</textinput>
+        <log id="msg" align="bottom" height="3">
+            Welcome to Battilde
+        </log>
+        <field id="field" min_height="3"></field>
+    </vbox>
+</hbox>

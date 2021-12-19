@@ -1,0 +1,14 @@
+{
+    "templates": ["default"],
+    "actions": {
+        "z": ["move", "north"],
+        "w": null,
+        "W": null,
+        "q": ["move", "west"],
+        "a": ["drop"],
+        "A": ["take"],
+        "Z": ["input", ["attack", ["north"]]],
+        "Q": ["input", ["attack", ["west"]]]
+    },
+    "shorthelp": "Controls:\n aqsd or arrows: Move around\n e: Grab\n q: Drop selected\n r: Interact\n f: Attack\n t: Chat\n E: Use selected\n A: Take selected\n xc: select item\n vb: select menu\n ctrl-c: close client"
+}

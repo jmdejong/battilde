@@ -34,8 +34,8 @@ Run the command `cargo run` to compile and run battilde with all the default opt
 Run the command `cargo build --release` to compile battilde and to create a binary which can then be run without cargo.
 The binary will appear in the `target/release` directory, with the name `battilde`.
 
-This repo only contains the server.
-To play the game you need [the client too](https://github.com/jmdejong/battilde-client)
+These instructions are only for the server.
+To play the game you need [the client too](client/README.md)
 
 ## Command line arguments
 
